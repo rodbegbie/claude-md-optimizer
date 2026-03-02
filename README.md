@@ -2,15 +2,30 @@
 
 A Claude Code skill that analyzes and optimizes your `CLAUDE.md` files for maximum effectiveness.
 
-Based on extensive research from [Anthropic's official docs](https://code.claude.com/docs/en/best-practices), [HumanLayer](https://www.humanlayer.dev/blog/writing-a-good-claude-md), [Builder.io](https://www.builder.io/blog/claude-md-guide), [SFEIR Institute](https://institute.sfeir.com/en/claude-code/claude-code-memory-system-claude-md/optimization/), [Arize](https://arize.com/blog/claude-md-best-practices-learned-from-optimizing-claude-code-with-prompt-learning/), and [Dometrain](https://dometrain.com/blog/creating-the-perfect-claudemd-for-claude-code/).
+Built on research from [Anthropic](https://code.claude.com/docs/en/best-practices), [HumanLayer](https://www.humanlayer.dev/blog/writing-a-good-claude-md), [Arize](https://arize.com/blog/claude-md-best-practices-learned-from-optimizing-claude-code-with-prompt-learning/), [Dometrain](https://dometrain.com/blog/creating-the-perfect-claudemd-for-claude-code/), and learnings from existing tools like [wrsmith108/claude-md-optimizer](https://github.com/wrsmith108/claude-md-optimizer) and [daymade/claude-code-skills](https://github.com/daymade/claude-code-skills).
 
 ## What It Does
 
-- Scans all your CLAUDE.md related files (project, user-level, rules, memory)
-- Scores your configuration 0-100
-- Detects anti-patterns (linter-territory content, vague instructions, code bloat)
-- Provides actionable optimization recommendations
-- Restructures files following proven best practices
+- **Automated scoring** (0-100) with detailed breakdown per file
+- **Anti-pattern detection** - linter-territory content, vague instructions, code bloat, duplicate lines
+- **Progressive disclosure analysis** - checks for sub-doc tables, trigger conditions, content tier classification
+- **Attention placement scoring** - verifies critical content is at top/bottom (LLM U-shaped attention)
+- **Essential section detection** - prohibitions, commands, directory structure, info recording principles
+- **Safe restructuring** - verbatim extraction only, zero information loss verification, user approval required
+
+## What Makes This Different
+
+| Feature | This skill | wrsmith108 | daymade |
+|---------|-----------|------------|---------|
+| Automated scoring (0-100) | Yes | No | No |
+| Anti-pattern regex detection | Yes | No | No |
+| Progressive disclosure workflow | Yes | Yes | Yes |
+| Attention placement analysis | Yes | No | Yes (principle) |
+| Content tier classification | Yes | Yes | Yes |
+| Trigger condition detection | Yes | No | Yes (principle) |
+| Info recording principles | Yes | No | Yes |
+| Safety rules (verbatim, 0% loss) | Yes | Yes | Yes |
+| Standalone analysis script | Yes | No | No |
 
 ## Key Optimization Rules
 
@@ -33,10 +48,13 @@ Based on extensive research from [Anthropic's official docs](https://code.claude
 
 - Code style/formatting rules (belong in linters, not CLAUDE.md)
 - Inline code snippets over 5 lines (use `file:line` references instead)
+- Short code patterns moved to references (keep 3-5 line patterns inline)
 - Narrative paragraphs (convert to bullet-point lists)
 - Vague directives ("follow best practices", "keep code clean")
 - Duplicate content across files
 - Missing essential sections (commands, prohibitions, structure)
+- References without trigger conditions (effectively invisible content)
+- Critical instructions buried in the middle (poor attention placement)
 
 ## Installation
 
@@ -71,9 +89,10 @@ Review my claude config and score it
 
 The skill will:
 1. Run the analysis script on your project
-2. Present a detailed report with scores
-3. Suggest and apply optimizations (with your approval)
-4. Re-run analysis to show before/after improvement
+2. Present a detailed report with scores and feature detection
+3. Classify content into Essential/Reference/Redundant tiers
+4. Suggest and apply optimizations (with your approval, verbatim extraction only)
+5. Re-run analysis to show before/after improvement with zero information loss
 
 ### Standalone Analysis Script
 
@@ -97,13 +116,19 @@ Add `--json` for machine-readable output.
     Lines: 245 | Tokens: ~2800 | Headings: 8
     List items: 42 | Paragraph lines: 68 | Code block lines: 45
     Imperative ratio: 35%
+    Attention placement: poor
+    Features: commands, dir-structure
     ISSUES (2):
-      [!] Project CLAUDE.md has 245 lines (recommended: <150).
+      [!] Project CLAUDE.md has 245 lines (recommended: under 150).
       [!] Linter-territory content detected. Move formatting rules to linter configs.
     WARNINGS (3):
       [~] Heavy use of paragraph text. Convert to bullet lists.
       [~] Code blocks use 45/245 lines (18%). Use file:line references.
       [~] Vague instruction found: 'follow best practices'.
+    SUGGESTIONS (3):
+      [*] No trigger conditions found. Add 'Read X when modifying Y' patterns.
+      [*] Attention placement is poor. Place prohibitions at top, refs at bottom.
+      [*] No 'information recording principles' section found.
 
 ------------------------------------------------------------
   TOTALS: 312 lines | ~3600 tokens
@@ -115,14 +140,22 @@ Add `--json` for machine-readable output.
 ============================================================
 ```
 
-## Research Sources
+## Optimization Workflow
 
-This skill is built on findings from these key sources:
+The skill follows a 7-priority optimization order:
+
+1. **Remove bloat** - Default behavior instructions, duplicates, linter content, vague directives
+2. **Restructure** - Paragraphs to bullets, imperative form, inline code to file:line refs
+3. **Progressive disclosure** - Classify Essential/Reference/Redundant, extract with trigger conditions
+4. **Attention placement** - Prohibitions at top, reference index at bottom (U-shaped attention)
+5. **Add essentials** - Project summary, commands, prohibitions, domain glossary
+6. **Modularize** - Extract to .claude/rules/ with glob patterns
+7. **Future-proof** - Add information recording principles to prevent re-bloating
+
+## Research Sources
 
 - [Anthropic - Claude Code Best Practices](https://code.claude.com/docs/en/best-practices)
 - [HumanLayer - Writing a Good CLAUDE.md](https://www.humanlayer.dev/blog/writing-a-good-claude-md)
-- [Builder.io - How to Write a Good CLAUDE.md File](https://www.builder.io/blog/claude-md-guide)
-- [SFEIR Institute - CLAUDE.md Optimization Guide](https://institute.sfeir.com/en/claude-code/claude-code-memory-system-claude-md/optimization/)
 - [Arize - CLAUDE.md Best Practices with Prompt Learning](https://arize.com/blog/claude-md-best-practices-learned-from-optimizing-claude-code-with-prompt-learning/)
 - [Dometrain - Creating the Perfect CLAUDE.md](https://dometrain.com/blog/creating-the-perfect-claudemd-for-claude-code/)
 
@@ -137,6 +170,7 @@ This skill is built on findings from these key sources:
 | Short code examples (5-line) | 40% fewer corrections vs long descriptions |
 | Validation commands | 30% less back-and-forth |
 | Repository-specific tuning | +10.87% accuracy on SWE Bench |
+| Progressive disclosure | 62% line reduction, 0% info loss |
 
 ## License
 

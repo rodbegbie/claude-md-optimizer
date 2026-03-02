@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 Analyze CLAUDE.md files and report optimization metrics.
-Checks line counts, structure quality, anti-patterns, and provides actionable scores.
+Checks line counts, structure quality, anti-patterns, progressive disclosure,
+attention placement, and provides actionable scores.
 """
 
 import sys
 import os
 import re
 import json
-from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -26,6 +26,14 @@ class FileAnalysis:
     code_block_lines: int = 0
     code_snippet_count: int = 0
     imperative_ratio: float = 0.0
+    has_prohibitions: bool = False
+    has_commands_section: bool = False
+    has_directory_structure: bool = False
+    has_project_summary: bool = False
+    has_sub_doc_table: bool = False
+    has_trigger_conditions: bool = False
+    has_info_recording_principles: bool = False
+    attention_score: str = "unknown"
     issues: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     suggestions: list = field(default_factory=list)
@@ -75,10 +83,58 @@ IMPERATIVE_STARTERS = [
     "follow", "apply", "remove", "delete", "update", "replace",
 ]
 
+# Prohibition indicators
+PROHIBITION_PATTERNS = [
+    r"do\s*not\b", r"don'?t\b", r"never\b", r"must\s*not\b",
+    r"prohibited", r"forbidden", r"avoid\b", r"DO\s*NOT",
+]
+
+# Trigger condition patterns (for progressive disclosure)
+TRIGGER_PATTERNS = [
+    r"(read|see|refer to|check)\s+[`\"]?[\w/.-]+[`\"]?\s+(when|if|before|after|for)",
+    r"when\s+(modifying|editing|working|changing|adding|creating)\s+",
+]
+
 
 def estimate_tokens(text: str) -> int:
     """Rough token estimation: ~4 chars per token for English."""
     return len(text) // 4
+
+
+def check_attention_placement(lines: list, content_lower: str) -> str:
+    """
+    Check if critical content is placed at beginning/end (U-shaped attention).
+    Returns: 'good', 'fair', or 'poor'.
+    """
+    if len(lines) < 20:
+        return "good"
+
+    top_20pct = "\n".join(lines[:len(lines) // 5]).lower()
+    bottom_20pct = "\n".join(lines[-len(lines) // 5:]).lower()
+    middle = "\n".join(lines[len(lines) // 5: -len(lines) // 5]).lower()
+
+    # Check if prohibitions are near the top
+    top_has_prohibitions = any(re.search(p, top_20pct) for p in PROHIBITION_PATTERNS)
+
+    # Check if commands are near the top
+    top_has_commands = bool(re.search(r"(```|`[a-z]+ )", top_20pct))
+
+    # Check if reference index is near the bottom
+    bottom_has_refs = bool(re.search(r"(reference|see also|sub-doc|trigger|when to read)", bottom_20pct))
+
+    score = 0
+    if top_has_prohibitions:
+        score += 1
+    if top_has_commands:
+        score += 1
+    if bottom_has_refs:
+        score += 1
+
+    if score >= 2:
+        return "good"
+    if score >= 1:
+        return "fair"
+    return "poor"
 
 
 def analyze_file(filepath: str) -> FileAnalysis:
@@ -96,6 +152,8 @@ def analyze_file(filepath: str) -> FileAnalysis:
     analysis.line_count = len(lines)
     analysis.char_count = len(content)
     analysis.estimated_tokens = estimate_tokens(content)
+
+    content_lower = content.lower()
 
     in_code_block = False
     paragraph_buffer = []
@@ -148,9 +206,24 @@ def analyze_file(filepath: str) -> FileAnalysis:
     analysis.code_snippet_count = code_blocks
     analysis.imperative_ratio = (imperative_lines / instruction_lines) if instruction_lines > 0 else 0
 
-    # Check anti-patterns
-    content_lower = content.lower()
+    # Check for essential sections
+    analysis.has_prohibitions = any(re.search(p, content_lower) for p in PROHIBITION_PATTERNS)
+    analysis.has_commands_section = bool(re.search(r"(command|build|test|lint|deploy|run)", content_lower)) and bool(re.search(r"`[a-z]+ ", content))
+    analysis.has_directory_structure = bool(re.search(r"(directory|structure|folder|src/|lib/|app/)", content_lower))
+    analysis.has_project_summary = analysis.line_count > 0 and len(lines[0].strip()) > 10
 
+    # Check for progressive disclosure features
+    analysis.has_sub_doc_table = bool(re.search(r"\|.*\|.*\|.*when", content_lower))
+    analysis.has_trigger_conditions = any(re.search(p, content_lower) for p in TRIGGER_PATTERNS)
+    analysis.has_info_recording_principles = bool(re.search(
+        r"(information\s*recording|where\s*(new|to)\s*(instructions?|rules?)\s*(go|belong)|adding\s*new\s*(rules?|instructions?))",
+        content_lower
+    ))
+
+    # Attention placement analysis
+    analysis.attention_score = check_attention_placement(lines, content_lower)
+
+    # --- Anti-pattern checks ---
     for pattern in LINTER_PATTERNS:
         if re.search(pattern, content_lower):
             analysis.issues.append(
@@ -167,27 +240,26 @@ def analyze_file(filepath: str) -> FileAnalysis:
                 "Replace with specific, actionable directives."
             )
 
-    # Line count checks
-    basename = os.path.basename(os.path.dirname(filepath))
+    # --- Line count checks ---
     if "rules" in filepath.lower():
         if analysis.line_count > 30:
             analysis.warnings.append(
-                f"Rule file has {analysis.line_count} lines (recommended: <30). "
+                f"Rule file has {analysis.line_count} lines (recommended: under 30). "
                 "Split into more focused rule files."
             )
     elif ".claude/CLAUDE.md" in filepath or "/.claude/" in filepath:
         if analysis.line_count > 50:
             analysis.issues.append(
-                f"User-level CLAUDE.md has {analysis.line_count} lines (recommended: <50)."
+                f"User-level CLAUDE.md has {analysis.line_count} lines (recommended: under 50)."
             )
     else:
         if analysis.line_count > 150:
             analysis.issues.append(
-                f"Project CLAUDE.md has {analysis.line_count} lines (recommended: <150). "
+                f"Project CLAUDE.md has {analysis.line_count} lines (recommended: under 150). "
                 "Risk of silent truncation and instruction loss."
             )
 
-    # Structure checks
+    # --- Structure checks ---
     if analysis.paragraph_line_count > analysis.line_count * 0.3 and analysis.line_count > 20:
         analysis.warnings.append(
             "Heavy use of paragraph text. Claude processes bullet points more efficiently. "
@@ -212,7 +284,7 @@ def analyze_file(filepath: str) -> FileAnalysis:
             "Use imperative form ('Use X' not 'We use X') for better instruction-following."
         )
 
-    # Check for duplicate content indicators
+    # --- Duplicate content ---
     seen_lines = {}
     for line in lines:
         stripped = line.strip().lower()
@@ -222,6 +294,50 @@ def analyze_file(filepath: str) -> FileAnalysis:
     if duplicates:
         analysis.warnings.append(
             f"Found {len(duplicates)} duplicate lines. Remove redundancy to save context tokens."
+        )
+
+    # --- Progressive disclosure checks (only for project CLAUDE.md) ---
+    if analysis.line_count > 80 and "rules" not in filepath.lower():
+        if not analysis.has_trigger_conditions:
+            analysis.suggestions.append(
+                "No trigger conditions found. Add 'Read X when modifying Y' patterns "
+                "for referenced documents to enable progressive disclosure."
+            )
+        if not analysis.has_sub_doc_table and analysis.line_count > 120:
+            analysis.suggestions.append(
+                "No sub-documentation table found. Consider adding a reference table "
+                "at the top linking to extracted detailed content."
+            )
+
+    # --- Attention placement check ---
+    if analysis.attention_score == "poor" and analysis.line_count > 30:
+        analysis.suggestions.append(
+            "Attention placement is poor. Place prohibitions and commands at the top, "
+            "reference index at the bottom. LLMs have U-shaped attention (strongest at edges)."
+        )
+    elif analysis.attention_score == "fair" and analysis.line_count > 50:
+        analysis.suggestions.append(
+            "Attention placement is fair. Consider moving critical prohibitions closer to the top."
+        )
+
+    # --- Missing essentials check ---
+    if analysis.line_count > 20 and "rules" not in filepath.lower() and "memory" not in filepath.lower():
+        if not analysis.has_prohibitions:
+            analysis.suggestions.append(
+                "No prohibition statements found. Add explicit 'DO NOT' rules - "
+                "they prevent errors more effectively than positive recommendations."
+            )
+        if not analysis.has_commands_section:
+            analysis.suggestions.append(
+                "No build/test commands found. Add exact commands with flags "
+                "to reduce back-and-forth (30% improvement)."
+            )
+
+    # --- Future-proofing check ---
+    if analysis.line_count > 80 and not analysis.has_info_recording_principles and "rules" not in filepath.lower():
+        analysis.suggestions.append(
+            "No 'information recording principles' section found. Add rules for "
+            "where new instructions belong to prevent future bloat."
         )
 
     return analysis
@@ -263,7 +379,6 @@ def find_claude_files(project_dir: str, home_dir: str) -> dict:
     memory_candidates = [
         os.path.join(project_dir, ".claude", "MEMORY.md"),
     ]
-    # Search for memory directories
     memory_base = os.path.join(home_dir, ".claude", "projects")
     if os.path.isdir(memory_base):
         for dirpath, dirnames, filenames in os.walk(memory_base):
@@ -309,6 +424,24 @@ def calculate_score(report: AnalysisReport) -> int:
         score += 5
     if len(report.rules_files) >= 3:
         score += 5
+
+    # Bonus for progressive disclosure features
+    primary = report.project_claude_md or report.user_claude_md
+    if primary and primary.exists:
+        if primary.has_trigger_conditions:
+            score += 3
+        if primary.has_sub_doc_table:
+            score += 3
+        if primary.has_info_recording_principles:
+            score += 2
+        if primary.attention_score == "good":
+            score += 3
+        elif primary.attention_score == "fair":
+            score += 1
+        if primary.has_prohibitions:
+            score += 2
+        if primary.has_commands_section:
+            score += 2
 
     return max(0, min(100, score))
 
@@ -361,6 +494,25 @@ def main():
         print(f"    Lines: {analysis.line_count} | Tokens: ~{analysis.estimated_tokens} | Headings: {analysis.heading_count}")
         print(f"    List items: {analysis.list_item_count} | Paragraph lines: {analysis.paragraph_line_count} | Code block lines: {analysis.code_block_lines}")
         print(f"    Imperative ratio: {analysis.imperative_ratio:.0%}")
+        print(f"    Attention placement: {analysis.attention_score}")
+
+        features = []
+        if analysis.has_prohibitions:
+            features.append("prohibitions")
+        if analysis.has_commands_section:
+            features.append("commands")
+        if analysis.has_directory_structure:
+            features.append("dir-structure")
+        if analysis.has_sub_doc_table:
+            features.append("sub-doc-table")
+        if analysis.has_trigger_conditions:
+            features.append("trigger-conditions")
+        if analysis.has_info_recording_principles:
+            features.append("info-principles")
+        if features:
+            print(f"    Features: {', '.join(features)}")
+        else:
+            print(f"    Features: none detected")
 
         if analysis.issues:
             print(f"    ISSUES ({len(analysis.issues)}):")
@@ -415,7 +567,7 @@ def main():
     if report.total_lines > 250:
         print(f"  [!] Total lines ({report.total_lines}) exceeds recommended maximum (250).")
     elif report.total_lines > 180:
-        print(f"  [~] Total lines ({report.total_lines}) is above optimal range (<180).")
+        print(f"  [~] Total lines ({report.total_lines}) is above optimal range (under 180).")
     else:
         print(f"  [OK] Total lines ({report.total_lines}) within optimal range.")
 

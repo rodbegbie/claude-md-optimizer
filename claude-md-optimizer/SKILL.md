@@ -1,6 +1,6 @@
 ---
 name: claude-md-optimizer
-description: Analyze and optimize CLAUDE.md files for Claude Code. This skill should be used when the user wants to improve their CLAUDE.md configuration, reduce context token waste, fix anti-patterns, or restructure their Claude Code instructions for maximum effectiveness. Triggers on requests like "optimize my CLAUDE.md", "review my claude config", "improve claude instructions", "clean up CLAUDE.md", or "make my CLAUDE.md more effective". Enforces proven limits (150 lines project, 50 lines user, 250 total) and scores files 0-100.
+description: Analyze and optimize CLAUDE.md files for Claude Code. This skill should be used when the user wants to improve their CLAUDE.md configuration, reduce context token waste, fix anti-patterns, or restructure their Claude Code instructions for maximum effectiveness. Triggers on requests like "optimize my CLAUDE.md", "review my claude config", "improve claude instructions", "clean up CLAUDE.md", or "make my CLAUDE.md more effective". Enforces proven limits (150 lines project, 50 lines user, 250 total) and scores files 0-100. Detects token compounding, non-English overhead, cross-file duplicates, and injection order issues.
 ---
 
 # CLAUDE.md Optimizer
@@ -9,6 +9,24 @@ description: Analyze and optimize CLAUDE.md files for Claude Code. This skill sh
 
 Analyze, score, and optimize CLAUDE.md files and related configuration (.claude/rules/, MEMORY.md)
 to maximize Claude Code's instruction-following quality while minimizing context token usage.
+
+**Critical insight**: Claude Code injects ALL CLAUDE.md content into EVERY API request (~12KB overhead),
+and this content accumulates in message history. After 30 turns, overhead exceeds 1MB.
+Every byte saved compounds across the entire session.
+
+## Injection Order (how Claude Code loads your config)
+
+Claude Code concatenates config in this fixed order per request:
+1. `~/.claude/CLAUDE.md` (global user instructions)
+2. `~/.claude/rules/*.md` (global rules)
+3. Project `CLAUDE.md` (root or `.claude/CLAUDE.md`)
+4. Project `.claude/rules/*.md` (project rules)
+5. `MEMORY.md` (auto-memory)
+
+All wrapped in `<system-reminder>` XML tags. This order affects attention placement strategy:
+- Content in position 1 (global) gets strong primacy attention
+- Content in position 3-4 (project) is in the middle zone - needs careful prioritization
+- Content in position 5 (memory) gets recency attention boost
 
 ## Safety Rules
 
@@ -36,6 +54,13 @@ working directory is used. The script scans:
 - All `.claude/rules/*.md` files (project and user level)
 - `MEMORY.md` files
 
+The report includes:
+- Per-file metrics (lines, tokens, structure quality)
+- **Session cost estimate** (per-request cost x estimated turns)
+- **Non-English content detection** with token overhead estimate
+- **Cross-file duplicate detection** (content repeated between files)
+- Anti-pattern identification and actionable fixes
+
 Present the analysis report to the user, highlighting the score and top issues.
 
 ### Step 2: Review Optimization Rules
@@ -47,9 +72,16 @@ Use this reference to identify which optimizations apply to the user's specific 
 
 Apply the following optimizations in priority order, always confirming changes with the user:
 
+**Priority 0 - Language optimization (if applicable)**
+- Detect non-English content in CLAUDE.md files
+- English instructions use ~30-50% fewer tokens than CJK languages (Korean, Japanese, Chinese)
+- Convert non-English instructions to English while preserving technical terms
+- Exception: Domain glossary terms, proper nouns, and user-facing strings stay in original language
+- This single change can save 2000-4000 tokens per request for CJK-heavy files
+
 **Priority 1 - Remove bloat (highest impact)**
 - Delete instructions Claude already follows by default
-- Remove content duplicated across files
+- Remove content duplicated across files (cross-file dedup)
 - Remove content that belongs in linter/formatter configs (.editorconfig, .prettierrc, .eslintrc)
 - Remove vague/non-actionable instructions ("follow best practices", "keep code clean")
 
@@ -67,11 +99,13 @@ Apply the following optimizations in priority order, always confirming changes w
 - Add trigger conditions to each reference ("Read X when modifying Y")
 - Keep Essential content inline, never extract it
 
-**Priority 4 - Optimize attention placement**
-- Place critical prohibitions and key commands at the top of the file
+**Priority 4 - Optimize attention placement (injection-order aware)**
+- Place critical prohibitions and key commands at the top of each file
 - Place reference trigger index at the bottom
 - LLMs have U-shaped attention: strongest at beginning and end, weakest in middle
-- Put less critical informational content in the middle sections
+- Account for injection order: global CLAUDE.md gets primacy, Memory gets recency
+- Project CLAUDE.md is mid-injection - front-load its most critical content
+- Avoid duplicating global prohibitions in project files (they already have strong attention)
 
 **Priority 5 - Add missing essentials**
 - Add project summary one-liner if missing
@@ -89,6 +123,7 @@ Apply the following optimizations in priority order, always confirming changes w
 - Add an "Information Recording Principles" section to prevent future bloat
 - Define what belongs in CLAUDE.md vs rules/ vs docs/ vs code comments
 - Establish a pattern for where new instructions should go
+- Recommend periodic `/clear` usage to reset accumulated message overhead
 
 ### Step 4: Validate
 
@@ -104,8 +139,9 @@ Verification checklist:
 - Essential content still inline
 - All sub-document links are valid relative paths
 - CI/build scripts that parse CLAUDE.md still work
+- Session cost estimate reduced
 
-Present before/after comparison: line counts, token estimates, and score.
+Present before/after comparison: line counts, token estimates, session cost, and score.
 
 ## Target Metrics
 
@@ -118,19 +154,23 @@ Present before/after comparison: line counts, token estimates, and score.
 | Total all sources | under 250 lines |
 | Optimization score | 80+ |
 | Information loss | 0% |
+| Non-English ratio | under 10% (convert to English) |
+| Cross-file duplicates | 0 |
 
 ## Key Anti-Patterns to Fix
 
+- Non-English instructions where English would be more token-efficient
+- Content duplicated across global and project files (cross-file redundancy)
 - Formatting/style rules that belong in linters (eslint, prettier, editorconfig)
 - Inline code blocks over 5 lines (replace with file:line references)
 - Narrative paragraphs (convert to bullet lists)
 - Vague directives ("follow best practices", "keep code clean")
-- Duplicate content across files
 - Instructions for default Claude behavior
 - Reference content without trigger conditions
 - Critical instructions buried in the middle of the document
+- Global prohibitions repeated in project CLAUDE.md (already injected first with strong attention)
 
 ## Resources
 
-- `scripts/analyze_claude_md.py` - Analysis and scoring tool (0-100 score, anti-pattern detection)
+- `scripts/analyze_claude_md.py` - Analysis and scoring tool (0-100 score, anti-pattern detection, session cost, language detection, cross-file dedup)
 - `references/optimization-rules.md` - Complete optimization rules, limits, progressive disclosure patterns, and checklist

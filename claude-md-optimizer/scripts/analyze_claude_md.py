@@ -2,13 +2,16 @@
 """
 Analyze CLAUDE.md files and report optimization metrics.
 Checks line counts, structure quality, anti-patterns, progressive disclosure,
-attention placement, and provides actionable scores.
+attention placement, language efficiency, cross-file duplicates, and session cost.
+
+Based on insights from claude-inspector (MITM proxy analysis of Claude Code API traffic).
 """
 
 import sys
 import os
 import re
 import json
+import unicodedata
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -34,6 +37,9 @@ class FileAnalysis:
     has_trigger_conditions: bool = False
     has_info_recording_principles: bool = False
     attention_score: str = "unknown"
+    non_english_ratio: float = 0.0
+    non_english_chars: int = 0
+    token_overhead_from_language: int = 0
     issues: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     suggestions: list = field(default_factory=list)
@@ -48,6 +54,9 @@ class AnalysisReport:
     total_lines: int = 0
     total_estimated_tokens: int = 0
     overall_score: int = 0
+    session_cost_per_request: int = 0
+    session_cost_30_turns: int = 0
+    cross_file_duplicates: list = field(default_factory=list)
     summary: list = field(default_factory=list)
 
 
@@ -95,10 +104,76 @@ TRIGGER_PATTERNS = [
     r"when\s+(modifying|editing|working|changing|adding|creating)\s+",
 ]
 
+# CJK Unicode ranges for non-English detection
+CJK_RANGES = [
+    (0x3000, 0x303F),   # CJK Symbols and Punctuation
+    (0x3040, 0x309F),   # Hiragana
+    (0x30A0, 0x30FF),   # Katakana
+    (0x4E00, 0x9FFF),   # CJK Unified Ideographs
+    (0xAC00, 0xD7AF),   # Hangul Syllables
+    (0x1100, 0x11FF),   # Hangul Jamo
+    (0x3130, 0x318F),   # Hangul Compatibility Jamo
+]
+
+
+def is_cjk_char(ch: str) -> bool:
+    """Check if a character is CJK (Chinese/Japanese/Korean)."""
+    cp = ord(ch)
+    return any(start <= cp <= end for start, end in CJK_RANGES)
+
+
+def detect_non_english(content: str) -> tuple:
+    """
+    Detect non-English (CJK) content ratio and estimate token overhead.
+    Returns: (non_english_ratio, non_english_char_count, estimated_extra_tokens)
+    """
+    if not content:
+        return 0.0, 0, 0
+
+    total_alpha = 0
+    cjk_count = 0
+
+    for ch in content:
+        cat = unicodedata.category(ch)
+        if cat.startswith("L") or cat.startswith("N"):
+            total_alpha += 1
+            if is_cjk_char(ch):
+                cjk_count += 1
+
+    if total_alpha == 0:
+        return 0.0, 0, 0
+
+    ratio = cjk_count / total_alpha
+    # CJK chars use ~1.5 tokens each vs ~0.25 tokens per English char
+    # Overhead = CJK chars * (1.5 - 0.25) = CJK chars * 1.25
+    extra_tokens = int(cjk_count * 1.25)
+
+    return ratio, cjk_count, extra_tokens
+
 
 def estimate_tokens(text: str) -> int:
-    """Rough token estimation: ~4 chars per token for English."""
-    return len(text) // 4
+    """
+    Language-aware token estimation.
+    English: ~4 chars per token. CJK: ~1.5 chars per token.
+    """
+    if not text:
+        return 0
+
+    english_chars = 0
+    cjk_chars = 0
+    other_chars = 0
+
+    for ch in text:
+        if is_cjk_char(ch):
+            cjk_chars += 1
+        elif ord(ch) < 128:
+            english_chars += 1
+        else:
+            other_chars += 1
+
+    # English ~4 chars/token, CJK ~1.5 chars/token, other ~3 chars/token
+    tokens = (english_chars / 4) + (cjk_chars / 1.5) + (other_chars / 3)
+    return int(tokens)
 
 
 def check_attention_placement(lines: list, content_lower: str) -> str:
@@ -111,7 +186,6 @@ def check_attention_placement(lines: list, content_lower: str) -> str:
 
     top_20pct = "\n".join(lines[:len(lines) // 5]).lower()
     bottom_20pct = "\n".join(lines[-len(lines) // 5:]).lower()
-    middle = "\n".join(lines[len(lines) // 5: -len(lines) // 5]).lower()
 
     # Check if prohibitions are near the top
     top_has_prohibitions = any(re.search(p, top_20pct) for p in PROHIBITION_PATTERNS)
@@ -137,6 +211,39 @@ def check_attention_placement(lines: list, content_lower: str) -> str:
     return "poor"
 
 
+def find_cross_file_duplicates(file_contents: dict) -> list:
+    """
+    Find lines duplicated across different files.
+    Returns list of (line_text, [file1, file2, ...]) tuples.
+    """
+    line_to_files = {}
+
+    for filepath, content in file_contents.items():
+        seen_in_file = set()
+        for line in content.splitlines():
+            stripped = line.strip().lower()
+            # Skip short lines, headings, empty lines, list markers only
+            if len(stripped) < 25 or stripped.startswith("#") or not stripped:
+                continue
+            # Normalize whitespace
+            normalized = " ".join(stripped.split())
+            if normalized not in seen_in_file:
+                seen_in_file.add(normalized)
+                if normalized not in line_to_files:
+                    line_to_files[normalized] = []
+                line_to_files[normalized].append(os.path.basename(filepath))
+
+    duplicates = []
+    for line_text, files in line_to_files.items():
+        if len(files) > 1:
+            # Deduplicate file list (same file shouldn't appear twice due to seen_in_file)
+            unique_files = list(dict.fromkeys(files))
+            if len(unique_files) > 1:
+                duplicates.append((line_text[:80], unique_files))
+
+    return duplicates
+
+
 def analyze_file(filepath: str) -> FileAnalysis:
     analysis = FileAnalysis(path=filepath)
 
@@ -152,6 +259,12 @@ def analyze_file(filepath: str) -> FileAnalysis:
     analysis.line_count = len(lines)
     analysis.char_count = len(content)
     analysis.estimated_tokens = estimate_tokens(content)
+
+    # Non-English detection
+    ne_ratio, ne_chars, ne_overhead = detect_non_english(content)
+    analysis.non_english_ratio = ne_ratio
+    analysis.non_english_chars = ne_chars
+    analysis.token_overhead_from_language = ne_overhead
 
     content_lower = content.lower()
 
@@ -223,6 +336,27 @@ def analyze_file(filepath: str) -> FileAnalysis:
     # Attention placement analysis
     analysis.attention_score = check_attention_placement(lines, content_lower)
 
+    # --- Non-English content check ---
+    if analysis.non_english_ratio > 0.1 and analysis.line_count > 5:
+        if analysis.non_english_ratio > 0.5:
+            analysis.issues.append(
+                f"Non-English content is {analysis.non_english_ratio:.0%} of text "
+                f"(~{analysis.token_overhead_from_language} extra tokens per request). "
+                "Convert instructions to English for 30-50% token savings. "
+                "Keep only domain glossary terms in original language."
+            )
+        elif analysis.non_english_ratio > 0.2:
+            analysis.warnings.append(
+                f"Non-English content is {analysis.non_english_ratio:.0%} of text "
+                f"(~{analysis.token_overhead_from_language} extra tokens per request). "
+                "Consider converting to English for better token efficiency."
+            )
+        else:
+            analysis.suggestions.append(
+                f"Minor non-English content detected ({analysis.non_english_ratio:.0%}). "
+                "Not critical, but English is more token-efficient."
+            )
+
     # --- Anti-pattern checks ---
     for pattern in LINTER_PATTERNS:
         if re.search(pattern, content_lower):
@@ -293,7 +427,7 @@ def analyze_file(filepath: str) -> FileAnalysis:
     duplicates = {k: v for k, v in seen_lines.items() if v > 1}
     if duplicates:
         analysis.warnings.append(
-            f"Found {len(duplicates)} duplicate lines. Remove redundancy to save context tokens."
+            f"Found {len(duplicates)} duplicate lines within file. Remove redundancy to save context tokens."
         )
 
     # --- Progressive disclosure checks (only for project CLAUDE.md) ---
@@ -419,6 +553,15 @@ def calculate_score(report: AnalysisReport) -> int:
     score -= total_warnings * 5
     score -= total_suggestions * 2
 
+    # Penalty for cross-file duplicates
+    score -= len(report.cross_file_duplicates) * 3
+
+    # Penalty for high session cost
+    if report.session_cost_per_request > 1500:
+        score -= 5
+    elif report.session_cost_per_request > 1000:
+        score -= 2
+
     # Bonus for good structure
     if report.total_lines <= 250:
         score += 5
@@ -443,6 +586,11 @@ def calculate_score(report: AnalysisReport) -> int:
         if primary.has_commands_section:
             score += 2
 
+    # Bonus for low non-English ratio across all files
+    total_ne_ratio = sum(a.non_english_ratio for a in all_analyses if a.exists)
+    if all_analyses and total_ne_ratio / max(len(all_analyses), 1) < 0.05:
+        score += 3
+
     return max(0, min(100, score))
 
 
@@ -456,11 +604,17 @@ def main():
     report = AnalysisReport()
     total_lines = 0
     total_tokens = 0
+    file_contents = {}
 
     for key, filepath in files.items():
         analysis = analyze_file(filepath)
         total_lines += analysis.line_count
         total_tokens += analysis.estimated_tokens
+
+        # Store content for cross-file duplicate detection
+        if analysis.exists:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                file_contents[filepath] = f.read()
 
         if key == "project_claude_md" or key == "dot_claude_md":
             report.project_claude_md = analysis
@@ -473,6 +627,16 @@ def main():
 
     report.total_lines = total_lines
     report.total_estimated_tokens = total_tokens
+
+    # Cross-file duplicate detection
+    if len(file_contents) > 1:
+        report.cross_file_duplicates = find_cross_file_duplicates(file_contents)
+
+    # Session cost estimation
+    # Claude Code injects all config content per request, accumulates in history
+    report.session_cost_per_request = total_tokens
+    report.session_cost_30_turns = total_tokens * 30 * 2  # request + history accumulation
+
     report.overall_score = calculate_score(report)
 
     if output_json:
@@ -495,6 +659,10 @@ def main():
         print(f"    List items: {analysis.list_item_count} | Paragraph lines: {analysis.paragraph_line_count} | Code block lines: {analysis.code_block_lines}")
         print(f"    Imperative ratio: {analysis.imperative_ratio:.0%}")
         print(f"    Attention placement: {analysis.attention_score}")
+
+        # Language info
+        if analysis.non_english_ratio > 0.01:
+            print(f"    Non-English: {analysis.non_english_ratio:.0%} ({analysis.non_english_chars} chars, ~{analysis.token_overhead_from_language} extra tokens)")
 
         features = []
         if analysis.has_prohibitions:
@@ -543,7 +711,10 @@ def main():
     if report.rules_files:
         print(f"  Modular Rules ({len(report.rules_files)} files):")
         for rf in report.rules_files:
-            print(f"    - {os.path.basename(rf.path)}: {rf.line_count} lines", end="")
+            lang_info = ""
+            if rf.non_english_ratio > 0.1:
+                lang_info = f" [non-EN: {rf.non_english_ratio:.0%}]"
+            print(f"    - {os.path.basename(rf.path)}: {rf.line_count} lines, ~{rf.estimated_tokens} tokens{lang_info}", end="")
             if rf.issues or rf.warnings:
                 print(f" [{len(rf.issues)} issues, {len(rf.warnings)} warnings]", end="")
             print()
@@ -559,9 +730,43 @@ def main():
     if report.memory_md:
         print_file_section("MEMORY.md", report.memory_md)
 
+    # Cross-file duplicates section
+    if report.cross_file_duplicates:
+        print("-" * 60)
+        print(f"  CROSS-FILE DUPLICATES ({len(report.cross_file_duplicates)} found):")
+        for line_text, file_list in report.cross_file_duplicates[:10]:
+            print(f"    [!] \"{line_text}...\"")
+            print(f"        Found in: {', '.join(file_list)}")
+        if len(report.cross_file_duplicates) > 10:
+            print(f"    ... and {len(report.cross_file_duplicates) - 10} more")
+        print()
+
     print("-" * 60)
     print(f"  TOTALS: {report.total_lines} lines | ~{report.total_estimated_tokens} tokens")
     print()
+
+    # Session cost
+    print(f"  SESSION COST ESTIMATE:")
+    print(f"    Per request: ~{report.session_cost_per_request} tokens (injected into every API call)")
+    print(f"    After 30 turns: ~{report.session_cost_30_turns:,} tokens (accumulated in message history)")
+    if report.session_cost_per_request > 1500:
+        print(f"    [!] High session cost. Consider reducing total content or using /clear periodically.")
+    elif report.session_cost_per_request > 1000:
+        print(f"    [~] Moderate session cost. Optimization would improve efficiency.")
+    else:
+        print(f"    [OK] Session cost is within efficient range.")
+    print()
+
+    # Total language overhead
+    total_lang_overhead = sum(
+        a.token_overhead_from_language
+        for a in ([report.project_claude_md, report.user_claude_md, report.memory_md] + report.rules_files)
+        if a and a.exists
+    )
+    if total_lang_overhead > 100:
+        print(f"  LANGUAGE OVERHEAD: ~{total_lang_overhead} extra tokens/request from non-English content")
+        print(f"    Converting to English would save ~{total_lang_overhead * 30 * 2:,} tokens over 30 turns")
+        print()
 
     # Thresholds
     if report.total_lines > 250:

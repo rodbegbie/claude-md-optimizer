@@ -1,5 +1,51 @@
 # CLAUDE.md Optimization Rules Reference
 
+## Token Compounding: Why Every Byte Matters
+
+Claude Code sends ALL CLAUDE.md content with EVERY API request. The cost compounds:
+
+| Scenario | Per-Request Overhead | After 30 Turns (cumulative) |
+|----------|--------------------|-----------------------------|
+| 100-line CLAUDE.md (~1.5KB) | ~400 tokens | ~12,000 tokens |
+| 250-line CLAUDE.md (~4KB) | ~1,000 tokens | ~30,000 tokens |
+| 500-line CLAUDE.md (~8KB) | ~2,000 tokens | ~60,000 tokens |
+
+**Session cost formula**: `per_request_tokens x num_turns x 2` (request + history accumulation)
+
+Use `/clear` periodically to reset accumulated message history overhead.
+
+## Injection Order
+
+Claude Code concatenates config in this fixed order:
+1. `~/.claude/CLAUDE.md` (global) - gets **primacy attention**
+2. `~/.claude/rules/*.md` (global rules)
+3. Project `CLAUDE.md` - **middle zone** (weakest attention)
+4. Project `.claude/rules/*.md`
+5. `MEMORY.md` - gets **recency attention**
+
+Implications:
+- Global prohibitions are already well-attended - do not repeat in project files
+- Front-load project CLAUDE.md with its most critical unique content
+- Memory content gets natural recency boost
+
+## Language Optimization
+
+English instructions are significantly more token-efficient:
+
+| Language | Avg Tokens per Instruction | vs English |
+|----------|---------------------------|------------|
+| English | ~15 tokens | baseline |
+| Korean | ~22 tokens | +47% |
+| Japanese | ~25 tokens | +67% |
+| Chinese | ~20 tokens | +33% |
+
+**Rule**: Write CLAUDE.md instructions in English. Keep only these in original language:
+- Domain-specific glossary terms
+- Proper nouns and project names
+- User-facing string patterns that must match exactly
+
+A typical 150-line Korean CLAUDE.md saves ~1,000 tokens per request when converted to English.
+
 ## Line Count Limits
 
 | File | Max Lines | Optimal |
@@ -69,6 +115,18 @@ LLMs exhibit U-shaped attention (primacy + recency effect):
 6. **Information recording principles** - Rules for where new instructions go (prevents future bloat)
 
 ## Must-Avoid Anti-Patterns
+
+### Non-English Instructions (for non-English users)
+- CJK characters use 2-3x more tokens than equivalent English
+- CLAUDE.md is injected into EVERY request - the overhead compounds
+- Convert instructions to English; keep only domain terms in original language
+- "PascalCase for public methods" is 5 tokens; the Korean equivalent is 8+ tokens
+
+### Cross-File Duplicates
+- Global CLAUDE.md and project CLAUDE.md are concatenated - duplicates waste tokens twice
+- Common duplicates: coding style rules, git conventions, testing guidelines
+- Rule: If it's in global, do NOT repeat in project. Global gets primacy attention.
+- Check for semantic duplicates too (same instruction, different wording)
 
 ### Code Style in CLAUDE.md
 - Never send an LLM to do a linter's job
@@ -144,15 +202,24 @@ Add a section defining where new instructions belong to prevent future bloat:
 | Repository-specific tuning | +10.87% accuracy on SWE Bench |
 | Progressive disclosure | 62% line reduction with 0% info loss (typical) |
 
+## Session Management
+
+- Use `/clear` after 20-30 turns to reset accumulated message history
+- Skills persist in context until `/clear` - avoid invoking unnecessary skills
+- MCP tools are lazy-loaded (deferred) - unused ones cost minimal tokens
+- Sub-agents do NOT inherit conversation history - they start fresh
+
 ## Checklist for Optimized CLAUDE.md
 
+- [ ] Instructions written in English (non-English converted)
+- [ ] No cross-file duplicates (global vs project vs rules)
 - [ ] Under 150 lines (project) / 50 lines (user)
 - [ ] All instructions in imperative form
 - [ ] No formatting/style rules (use linter configs instead)
 - [ ] No inline code snippets over 5 lines (use file:line refs)
 - [ ] Short code patterns (3-5 lines) kept inline
 - [ ] No vague instructions
-- [ ] No duplicate content
+- [ ] No duplicate content within files
 - [ ] Key commands documented with exact flags
 - [ ] Critical paths declared explicitly
 - [ ] Prohibition list at top of file
@@ -161,5 +228,6 @@ Add a section defining where new instructions belong to prevent future bloat:
 - [ ] MEMORY.md under 200 lines, organized by topic
 - [ ] Sub-documentation table with trigger conditions
 - [ ] Information recording principles section included
-- [ ] Critical content at top/bottom (U-shaped attention)
+- [ ] Critical content at top/bottom (U-shaped attention aware of injection order)
 - [ ] Zero information loss verified after extraction
+- [ ] Session cost estimate under 1,000 tokens per request

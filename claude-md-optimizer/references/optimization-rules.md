@@ -14,12 +14,18 @@ language:
 
 ## Line Count Limits
 
+Documented by Anthropic (Claude Code memory docs): under 200 lines per
+CLAUDE.md or rules file; MEMORY.md loads its first 200 lines or 25KB; a
+file over 4 MiB is skipped. The combined limit behind the startup warning
+is not documented.
+
+This tool's own heuristics (not from Anthropic's documentation):
+
 | File | Max Lines | Optimal |
 | --- | --- | --- |
 | Project CLAUDE.md | 150 | under 100 |
 | User ~/.claude/CLAUDE.md | 50 | under 30 |
 | Individual .claude/rules/*.md | 30 | under 20 |
-| MEMORY.md | 200 | under 100 |
 | Total across all sources | 250 | under 180 |
 
 ## Instruction Capacity
@@ -160,7 +166,6 @@ endpoints"
 
 - Create separate .md files per concern (testing, security, API, frontend)
 - Use glob patterns in YAML headers for auto-loading
-- Recommended: 3-5 rule files minimum
 
 ### Information Recording Principles
 
@@ -190,7 +195,8 @@ Add a section defining where new instructions belong to prevent future bloat:
 
 - [ ] Instructions written in English (non-English converted)
 - [ ] No cross-file duplicates (global vs project vs rules)
-- [ ] Under 150 lines (project) / 50 lines (user)
+- [ ] Under 200 lines per file (documented); this tool's own heuristics
+  are 150 (project) and 50 (user)
 - [ ] All instructions in imperative form
 - [ ] No formatting/style rules (use linter configs instead)
 - [ ] No inline code snippets over 5 lines (use file:line refs)
@@ -200,9 +206,8 @@ Add a section defining where new instructions belong to prevent future bloat:
 - [ ] Key commands documented with exact flags
 - [ ] Critical paths declared explicitly
 - [ ] Prohibition list at top of file
-- [ ] 3+ modular rule files in .claude/rules/
 - [ ] Domain glossary if specialized project
-- [ ] MEMORY.md under 200 lines, organized by topic
+- [ ] MEMORY.md within its 200 lines or 25KB load limit, organized by topic
 - [ ] Sub-documentation table with trigger conditions
 - [ ] Information recording principles section included
 - [ ] Critical content at top/bottom of each file

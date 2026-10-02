@@ -3,8 +3,6 @@
 Analyze CLAUDE.md files and report optimization metrics.
 Checks line counts, structure quality, anti-patterns, progressive disclosure,
 attention placement, language efficiency, and cross-file duplicates.
-
-Based on insights from claude-inspector (MITM proxy analysis of Claude Code API traffic).
 """
 
 import sys
@@ -55,6 +53,7 @@ class AnalysisReport:
     project_claude_md: Optional[FileAnalysis] = None
     user_claude_md: Optional[FileAnalysis] = None
     rules_files: list = field(default_factory=list)
+    other_files: list = field(default_factory=list)
     memory_md: Optional[FileAnalysis] = None
     total_lines: int = 0
     total_estimated_tokens: int = 0
@@ -247,17 +246,18 @@ def find_cross_file_duplicates(file_contents: dict) -> list:
     return duplicates
 
 
-def analyze_file(filepath: str) -> FileAnalysis:
+def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
     analysis = FileAnalysis(path=filepath)
 
-    if not os.path.exists(filepath):
-        analysis.exists = False
-        return analysis
+    if content is None:
+        if not os.path.exists(filepath):
+            analysis.exists = False
+            return analysis
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
 
     analysis.exists = True
-    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-        content = f.read()
-        lines = content.splitlines()
+    lines = content.splitlines()
 
     analysis.line_count = len(lines)
     analysis.char_count = len(content)
@@ -493,6 +493,7 @@ def calculate_score(report: AnalysisReport) -> int:
     if report.user_claude_md:
         all_analyses.append(report.user_claude_md)
     all_analyses.extend(report.rules_files)
+    all_analyses.extend(report.other_files)
     if report.memory_md:
         all_analyses.append(report.memory_md)
 
@@ -552,15 +553,27 @@ def main():
     memory_path = memory_dir(project_dir, home_dir)
 
     report = AnalysisReport()
+    primary = next(
+        (f for scope in (Scope.PROJECT, Scope.AGENTS) for f in always if f.scope == scope),
+        None,
+    )
     for f in always:
-        if f.scope == Scope.PROJECT and report.project_claude_md is None:
-            report.project_claude_md = analyze_file(str(f.path))
+        analysis = analyze_file(str(f.path), f.text)
+        if f is primary:
+            report.project_claude_md = analysis
         elif f.scope == Scope.USER:
-            report.user_claude_md = analyze_file(str(f.path))
+            report.user_claude_md = analysis
         elif f.scope in (Scope.USER_RULE, Scope.PROJECT_RULE):
-            report.rules_files.append(analyze_file(str(f.path)))
+            report.rules_files.append(analysis)
         elif f.scope == Scope.MEMORY:
-            report.memory_md = analyze_file(str(f.path))
+            report.memory_md = analysis
+        else:
+            report.other_files.append(analysis)
+    project_title = (
+        "Project AGENTS.md"
+        if primary is not None and primary.scope == Scope.AGENTS
+        else "Project CLAUDE.md"
+    )
 
     report.total_lines = sum(f.lines for f in always)
     report.total_estimated_tokens = context_totals.always
@@ -675,7 +688,7 @@ def main():
         print()
 
     if report.project_claude_md:
-        print_file_section("Project CLAUDE.md", report.project_claude_md)
+        print_file_section(project_title, report.project_claude_md)
     else:
         print("  Project CLAUDE.md: Not found")
         print()
@@ -707,6 +720,9 @@ def main():
 
     if report.memory_md:
         print_file_section("MEMORY.md", report.memory_md)
+
+    for other in report.other_files:
+        print_file_section("Other instruction file", other)
 
     # Cross-file duplicates section
     if report.cross_file_duplicates:

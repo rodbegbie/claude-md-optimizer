@@ -49,15 +49,42 @@ def discover(
 ) -> list[LoadedFile]:
     project = project_dir.resolve()
     loader = _Loader(project, home_dir, _read_excludes(project, home_dir))
-    has_claude = any(
-        (directory / name).is_file()
+    claude_files = [
+        path
         for directory in [project, *project.parents]
-        for name in CLAUDE_FAMILY
-    )
-    _discover_memory_files(loader, project, home_dir, managed_dir, has_claude)
+        for path in _counting_claude_files(directory, home_dir)
+    ]
+    dormant_note = _dormant_note(claude_files, project) if claude_files else None
+    _discover_memory_files(loader, project, home_dir, managed_dir, dormant_note)
     _discover_auto_memory(loader, home_dir)
-    _discover_nested(loader, project, has_claude)
+    _discover_nested(loader, project, home_dir, has_claude=bool(claude_files))
     return loader.files
+
+
+def _counting_claude_files(directory: Path, home_dir: Path) -> list[Path]:
+    home = home_dir.resolve()
+    return [
+        directory / name
+        for name in CLAUDE_FAMILY
+        if not (directory == home and name == ".claude/CLAUDE.md")
+        and (directory / name).is_file()
+    ]
+
+
+def _is_unloaded_ancestor_dot_claude(path: Path, project: Path) -> bool:
+    return path.parent.name == ".claude" and path.parent.parent != project
+
+
+def _dormant_note(claude_files: list[Path], project: Path) -> str:
+    loaded = [
+        p for p in claude_files if not _is_unloaded_ancestor_dot_claude(p, project)
+    ]
+    if loaded:
+        return DORMANT_AGENTS_NOTE
+    return (
+        f"{DORMANT_AGENTS_NOTE} ({claude_files[0]} counts for this check but is "
+        "not loaded by this tool; unverified whether Claude Code loads it)"
+    )
 
 
 class _Loader:
@@ -342,7 +369,7 @@ def _discover_memory_files(
     project: Path,
     home_dir: Path,
     managed_dir: Path | None,
-    has_claude: bool,
+    dormant_note: str | None,
 ) -> None:
     if managed_dir is not None:
         loader.add(managed_dir / "CLAUDE.md", Scope.MANAGED)
@@ -352,10 +379,10 @@ def _discover_memory_files(
         is_project = directory == project
         for name in AGENTS_FAMILY:
             path = directory / name
-            if has_claude:
+            if dormant_note is not None:
                 dormant = loader.add(path, Scope.AGENTS, LoadMode.DORMANT)
                 if dormant is not None:
-                    _note(dormant, DORMANT_AGENTS_NOTE)
+                    _note(dormant, dormant_note)
             else:
                 loader.add(path, Scope.AGENTS)
         loader.add(
@@ -381,7 +408,9 @@ def _discover_rules(loader: _Loader, rules_dir: Path, scope: Scope) -> None:
         loader.add(path, scope, is_rule=True)
 
 
-def _discover_nested(loader: _Loader, project: Path, has_claude: bool) -> None:
+def _discover_nested(
+    loader: _Loader, project: Path, home_dir: Path, *, has_claude: bool
+) -> None:
     agents: list[Path] = []
     for current, dirnames, filenames in os.walk(project):
         dirnames[:] = sorted(
@@ -395,7 +424,7 @@ def _discover_nested(loader: _Loader, project: Path, has_claude: bool) -> None:
         if (
             not has_claude
             and "AGENTS.md" in filenames
-            and not any((directory / name).is_file() for name in CLAUDE_FAMILY)
+            and not _counting_claude_files(directory, home_dir)
         ):
             agents.append(directory / "AGENTS.md")
     for path in agents:

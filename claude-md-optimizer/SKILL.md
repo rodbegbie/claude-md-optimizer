@@ -116,7 +116,6 @@ with the user:
 
 - Extract concern-specific rules into .claude/rules/ files
 - Add YAML glob headers to rule files for targeted loading
-- Target 3-5 rule files for optimal modular coverage
 
 #### Priority 7 - Future-proof
 
@@ -145,12 +144,24 @@ Present before/after comparison: line counts, token estimates, and score.
 
 ## Target Metrics
 
-| Metric | Target |
+Documented by Anthropic (Claude Code memory docs):
+
+| Metric | Limit |
+| --- | --- |
+| Each CLAUDE.md or rules file | under 200 lines |
+| MEMORY.md | first 200 lines or 25KB load |
+| Any instruction file | over 4 MiB is skipped |
+
+The combined size limit behind Claude Code's startup warning is not
+documented, so no total is stated as official.
+
+This tool's own heuristics (not from Anthropic's documentation):
+
+| Metric | Heuristic |
 | --- | --- |
 | Project CLAUDE.md | under 150 lines |
 | User CLAUDE.md | under 50 lines |
-| Rule files | under 30 lines each, 3-5 files |
-| MEMORY.md | under 200 lines |
+| Rule files | under 30 lines each |
 | Total all sources | under 250 lines |
 | Optimization score | 80+ |
 | Information loss | 0% |

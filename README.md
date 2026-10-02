@@ -41,12 +41,15 @@ Built on research from [Anthropic][anthropic], [HumanLayer][humanlayer],
 
 ## Key Optimization Rules
 
+Anthropic's documented guidance is under 200 lines per `CLAUDE.md` or rules
+file, and `MEMORY.md` loads its first 200 lines or 25KB. The numbers below are
+this tool's own heuristics, not documented limits.
+
 | File | Max Lines | Optimal |
 | --- | --- | --- |
 | Project `CLAUDE.md` | 150 | under 100 |
 | User `~/.claude/CLAUDE.md` | 50 | under 30 |
 | Individual `.claude/rules/*.md` | 30 | under 20 |
-| `MEMORY.md` | 200 | under 100 |
 | **Total across all sources** | **250** | **under 180** |
 
 ### Why These Limits Matter

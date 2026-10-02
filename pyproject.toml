@@ -1,0 +1,15 @@
+[project]
+name = "claude-md-optimizer"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+extend-exclude = ["claude-md-optimizer/scripts/analyze_claude_md.py"]
+
+[tool.pytest.ini_options]
+pythonpath = ["claude-md-optimizer/scripts"]
+testpaths = ["tests"]

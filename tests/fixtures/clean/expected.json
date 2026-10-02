@@ -1,0 +1,16 @@
+{
+  "must_include": [],
+  "must_exclude": [
+    "size-file",
+    "size-memory",
+    "size-always-on",
+    "derivable-content",
+    "hook-candidate",
+    "emphasis-dilution",
+    "stale-reference",
+    "scope-candidate",
+    "import-misconception",
+    "vague-instruction",
+    "duplicate-across"
+  ]
+}

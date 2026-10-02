@@ -1,0 +1,1 @@
+Yes, this is good.  BTW, regarding section 3's git workflow: let's always plan on opening PRs to main for my review.

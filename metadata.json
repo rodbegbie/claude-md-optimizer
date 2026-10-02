@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M3YW6QEYKARFMQK3FFHPMDB0",
+  "strategy": "manual-commit",
+  "branch": "chore/baseline-fixtures",
+  "checkpoints_count": 2,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 12035,
+    "cache_read_tokens": 2870905,
+    "output_tokens": 7299,
+    "api_call_count": 11,
+    "subagent_tokens": {
+      "input_tokens": 14,
+      "cache_creation_tokens": 66156,
+      "cache_read_tokens": 289298,
+      "output_tokens": 989,
+      "api_call_count": 7
+    }
+  }
+}

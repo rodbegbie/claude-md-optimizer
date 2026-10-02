@@ -4,7 +4,12 @@ import re
 import sys
 from pathlib import Path, PurePath
 
-from claude_md.limits import MAX_FILE_BYTES, MAX_IMPORT_DEPTH
+from claude_md.limits import (
+    MAX_FILE_BYTES,
+    MAX_IMPORT_DEPTH,
+    MEMORY_BYTES,
+    MEMORY_LINES,
+)
 from claude_md.model import LoadedFile, LoadMode, Scope
 from claude_md.text import effective_text, parse_paths, split_frontmatter
 
@@ -50,6 +55,7 @@ def discover(
         for name in CLAUDE_FAMILY
     )
     _discover_memory_files(loader, project, home_dir, managed_dir, has_claude)
+    _discover_auto_memory(loader, home_dir)
     _discover_nested(loader, project, has_claude)
     return loader.files
 
@@ -86,6 +92,16 @@ class _Loader:
                 _note(loaded, f"excluded by claudeMdExcludes: {pattern}")
         if scope in EXPANDING_SCOPES and loaded.mode == LoadMode.ALWAYS:
             self._expand(loaded, scope in PROJECT_LEVEL_SCOPES, hop=0, chain=(key,))
+        return loaded
+
+    @property
+    def project(self) -> Path:
+        return self._project
+
+    def add_memory(self, path: Path, mode: LoadMode) -> LoadedFile:
+        loaded = _read(path, Scope.MEMORY, mode, order=len(self.files))
+        self._seen.add(path.resolve())
+        self.files.append(loaded)
         return loaded
 
     def _matching_exclude(self, path: Path, resolved: Path) -> str | None:
@@ -215,18 +231,110 @@ def _skipped(path: Path, scope: Scope, order: int, note: str) -> LoadedFile:
     )
 
 
-def _read_excludes(project: Path, home_dir: Path) -> list[str]:
-    merged: dict[str, None] = {}
+def _settings_dicts(project: Path, home_dir: Path) -> list[dict]:
+    found: list[dict] = []
     for base in (home_dir, project):
         for name in ("settings.json", "settings.local.json"):
             try:
                 data = json.loads((base / ".claude" / name).read_text("utf-8"))
             except (OSError, ValueError):
                 continue
-            entries = data.get("claudeMdExcludes") if isinstance(data, dict) else None
-            if isinstance(entries, list):
-                merged.update((e, None) for e in entries if isinstance(e, str))
+            if isinstance(data, dict):
+                found.append(data)
+    return found
+
+
+def _read_excludes(project: Path, home_dir: Path) -> list[str]:
+    merged: dict[str, None] = {}
+    for data in _settings_dicts(project, home_dir):
+        entries = data.get("claudeMdExcludes")
+        if isinstance(entries, list):
+            merged.update((e, None) for e in entries if isinstance(e, str))
     return list(merged)
+
+
+def encode_project_path(path: Path) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "-", str(path))
+
+
+def find_git_root(project_dir: Path) -> Path | None:
+    try:
+        start = project_dir.resolve()
+        for directory in (start, *start.parents):
+            git = directory / ".git"
+            if git.is_dir():
+                return directory
+            if git.exists():
+                return _linked_worktree_root(git) or directory
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def _linked_worktree_root(git_file: Path) -> Path | None:
+    try:
+        first = git_file.read_text("utf-8").splitlines()[0]
+    except (OSError, ValueError, IndexError):
+        return None
+    if not first.startswith("gitdir:"):
+        return None
+    try:
+        gitdir = (git_file.parent / first.removeprefix("gitdir:").strip()).resolve()
+    except (OSError, ValueError):
+        return None
+    common = gitdir.parent.parent
+    if gitdir.parent.name == "worktrees" and common.name == ".git":
+        return common.parent
+    return None
+
+
+def memory_dir(project_dir: Path, home_dir: Path) -> Path:
+    project = project_dir.resolve()
+    chosen: Path | None = None
+    for data in _settings_dicts(project, home_dir):
+        value = data.get("autoMemoryDirectory")
+        if not isinstance(value, str):
+            continue
+        if value.startswith("~/"):
+            chosen = home_dir / value[2:]
+        elif os.path.isabs(value):
+            chosen = Path(value)
+    if chosen is not None:
+        return chosen
+    root = find_git_root(project) or project
+    return home_dir / ".claude" / "projects" / encode_project_path(root) / "memory"
+
+
+def _truncate_memory(text: str) -> tuple[str, str | None]:
+    lines = text.splitlines(keepends=True)
+    by_lines = "".join(lines[: MEMORY_LINES.value])
+    by_bytes = text.encode()[: MEMORY_BYTES.value].decode("utf-8", errors="ignore")
+    if len(by_bytes) < len(by_lines):
+        kept, limit = by_bytes, f"{MEMORY_BYTES.value} bytes"
+    else:
+        kept, limit = by_lines, f"{MEMORY_LINES.value} lines"
+    if kept == text:
+        return text, None
+    dropped = len(lines) - len(kept.splitlines())
+    return kept, f"truncated: only the first {limit} load; {dropped} lines dropped"
+
+
+def _discover_auto_memory(loader: _Loader, home_dir: Path) -> None:
+    directory = memory_dir(loader.project, home_dir)
+    try:
+        topics = sorted(p for p in directory.glob("*.md") if p.is_file())
+    except OSError:
+        return
+    index = directory / "MEMORY.md"
+    if index in topics:
+        topics.remove(index)
+        loaded = loader.add_memory(index, LoadMode.ALWAYS)
+        if loaded.mode == LoadMode.ALWAYS:
+            loaded.text, note = _truncate_memory(loaded.text)
+            if note:
+                _note(loaded, note)
+    for path in topics:
+        loader.add_memory(path, LoadMode.ON_DEMAND)
 
 
 def _discover_memory_files(

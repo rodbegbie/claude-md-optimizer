@@ -100,6 +100,14 @@ on the planning branch, not here.
   `uv run ruff check . && uv run ruff format --check .`. Expected: PASS.
 - [ ] **Step 5: Commit** `pyproject.toml uv.lock .gitignore tests/` with
   message `chore: add pytest scaffold`.
+- [ ] **Step 6: Track the agent tool config** as its own commit, per Rod.
+  Run `git status --short -uall` and confirm exactly these four untracked
+  files, and nothing else, are listed: `.claude/settings.json`,
+  `.codex/hooks.json`, `.entire/settings.json`, `.entire/.gitignore`. The
+  `.entire/.gitignore` already excludes `metadata/`, `logs/` and `tmp/`, so
+  session transcripts stay out. Re-scan the four files for tokens and
+  absolute home paths; stop and ask Rod if anything turns up. Stage them by
+  path and commit with message `chore: track agent tool config`.
 
 ### Task 0.2: Failing tests that reproduce the known bugs
 

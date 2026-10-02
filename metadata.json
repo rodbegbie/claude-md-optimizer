@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M3ZGXNNBECDB8DXMFHHP6SBY",
+  "strategy": "manual-commit",
+  "branch": "fix/discovery-layer",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md",
+    "claude-md-optimizer/SKILL.md",
+    "claude-md-optimizer/references/optimization-rules.md",
+    "claude-md-optimizer/scripts/analyze_claude_md.py",
+    "claude-md-optimizer/scripts/claude_md/discovery.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 954,
+    "cache_creation_tokens": 1910066,
+    "cache_read_tokens": 183048752,
+    "output_tokens": 384931,
+    "api_call_count": 415,
+    "subagent_tokens": {
+      "input_tokens": 6,
+      "cache_creation_tokens": 8751,
+      "cache_read_tokens": 127260,
+      "output_tokens": 23,
+      "api_call_count": 3
+    }
+  }
+}

@@ -26,6 +26,10 @@ def test_unverified_limits():
     assert limits.COMBINED_LINES == limits.Limit(0, False, "unverified")
 
 
+def test_unverified_limit_names():
+    assert limits.unverified_limit_names() == ["COMBINED_LINES"]
+
+
 def test_limit_is_frozen():
     with pytest.raises(dataclasses.FrozenInstanceError):
         limits.FILE_LINES.value = 1

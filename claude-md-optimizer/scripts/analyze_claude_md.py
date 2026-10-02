@@ -2,7 +2,7 @@
 """
 Analyze CLAUDE.md files and report optimization metrics.
 Checks line counts, structure quality, anti-patterns, progressive disclosure,
-attention placement, language efficiency, cross-file duplicates, and session cost.
+attention placement, language efficiency, and cross-file duplicates.
 
 Based on insights from claude-inspector (MITM proxy analysis of Claude Code API traffic).
 """
@@ -13,7 +13,12 @@ import re
 import json
 import unicodedata
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 from typing import Optional
+
+from claude_md import limits
+from claude_md.discovery import default_managed_dir, discover, memory_dir
+from claude_md.model import LoadMode, Scope, totals
 
 
 @dataclass
@@ -54,8 +59,6 @@ class AnalysisReport:
     total_lines: int = 0
     total_estimated_tokens: int = 0
     overall_score: int = 0
-    session_cost_per_request: int = 0
-    session_cost_30_turns: int = 0
     cross_file_duplicates: list = field(default_factory=list)
     summary: list = field(default_factory=list)
 
@@ -477,57 +480,6 @@ def analyze_file(filepath: str) -> FileAnalysis:
     return analysis
 
 
-def find_claude_files(project_dir: str, home_dir: str) -> dict:
-    """Find all CLAUDE.md related files."""
-    files = {}
-
-    # Project CLAUDE.md
-    project_claude = os.path.join(project_dir, "CLAUDE.md")
-    if os.path.exists(project_claude):
-        files["project_claude_md"] = project_claude
-
-    # Project .claude/CLAUDE.md
-    dot_claude = os.path.join(project_dir, ".claude", "CLAUDE.md")
-    if os.path.exists(dot_claude):
-        files["dot_claude_md"] = dot_claude
-
-    # User-level CLAUDE.md
-    user_claude = os.path.join(home_dir, ".claude", "CLAUDE.md")
-    if os.path.exists(user_claude):
-        files["user_claude_md"] = user_claude
-
-    # Rules files
-    rules_dir = os.path.join(project_dir, ".claude", "rules")
-    if os.path.isdir(rules_dir):
-        for f in sorted(os.listdir(rules_dir)):
-            if f.endswith(".md"):
-                files[f"rule_{f}"] = os.path.join(rules_dir, f)
-
-    user_rules_dir = os.path.join(home_dir, ".claude", "rules")
-    if os.path.isdir(user_rules_dir):
-        for f in sorted(os.listdir(user_rules_dir)):
-            if f.endswith(".md"):
-                files[f"user_rule_{f}"] = os.path.join(user_rules_dir, f)
-
-    # MEMORY.md
-    memory_candidates = [
-        os.path.join(project_dir, ".claude", "MEMORY.md"),
-    ]
-    memory_base = os.path.join(home_dir, ".claude", "projects")
-    if os.path.isdir(memory_base):
-        for dirpath, dirnames, filenames in os.walk(memory_base):
-            if "MEMORY.md" in filenames:
-                files["memory_md"] = os.path.join(dirpath, "MEMORY.md")
-                break
-
-    for mc in memory_candidates:
-        if os.path.exists(mc):
-            files["memory_md"] = mc
-            break
-
-    return files
-
-
 def calculate_score(report: AnalysisReport) -> int:
     """Calculate overall optimization score (0-100)."""
     score = 100
@@ -555,12 +507,6 @@ def calculate_score(report: AnalysisReport) -> int:
 
     # Penalty for cross-file duplicates
     score -= len(report.cross_file_duplicates) * 3
-
-    # Penalty for high session cost
-    if report.session_cost_per_request > 1500:
-        score -= 5
-    elif report.session_cost_per_request > 1000:
-        score -= 2
 
     # Bonus for good structure
     if report.total_lines <= 250:
@@ -595,58 +541,90 @@ def calculate_score(report: AnalysisReport) -> int:
 
 
 def main():
-    project_dir = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
-    home_dir = os.path.expanduser("~")
+    args = [a for a in sys.argv[1:] if a != "--json"]
+    project_dir = Path(args[0] if args else os.getcwd()).resolve()
+    home_dir = Path.home()
     output_json = "--json" in sys.argv
 
-    files = find_claude_files(project_dir, home_dir)
+    files = discover(project_dir, home_dir, default_managed_dir())
+    always = [f for f in files if f.mode == LoadMode.ALWAYS]
+    context_totals = totals(files)
+    memory_path = memory_dir(project_dir, home_dir)
 
     report = AnalysisReport()
-    total_lines = 0
-    total_tokens = 0
-    file_contents = {}
+    for f in always:
+        if f.scope == Scope.PROJECT and report.project_claude_md is None:
+            report.project_claude_md = analyze_file(str(f.path))
+        elif f.scope == Scope.USER:
+            report.user_claude_md = analyze_file(str(f.path))
+        elif f.scope in (Scope.USER_RULE, Scope.PROJECT_RULE):
+            report.rules_files.append(analyze_file(str(f.path)))
+        elif f.scope == Scope.MEMORY:
+            report.memory_md = analyze_file(str(f.path))
 
-    for key, filepath in files.items():
-        analysis = analyze_file(filepath)
-        total_lines += analysis.line_count
-        total_tokens += analysis.estimated_tokens
-
-        # Store content for cross-file duplicate detection
-        if analysis.exists:
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                file_contents[filepath] = f.read()
-
-        if key == "project_claude_md" or key == "dot_claude_md":
-            report.project_claude_md = analysis
-        elif key == "user_claude_md":
-            report.user_claude_md = analysis
-        elif key == "memory_md":
-            report.memory_md = analysis
-        elif key.startswith("rule_") or key.startswith("user_rule_"):
-            report.rules_files.append(analysis)
-
-    report.total_lines = total_lines
-    report.total_estimated_tokens = total_tokens
-
-    # Cross-file duplicate detection
-    if len(file_contents) > 1:
-        report.cross_file_duplicates = find_cross_file_duplicates(file_contents)
-
-    # Session cost estimation
-    # Claude Code injects all config content per request, accumulates in history
-    report.session_cost_per_request = total_tokens
-    report.session_cost_30_turns = total_tokens * 30 * 2  # request + history accumulation
-
+    report.total_lines = sum(f.lines for f in always)
+    report.total_estimated_tokens = context_totals.always
+    if len(always) > 1:
+        report.cross_file_duplicates = find_cross_file_duplicates(
+            {str(f.path): f.text for f in always}
+        )
     report.overall_score = calculate_score(report)
 
+    unverified = limits.unverified_limit_names()
+    file_entries = [
+        {
+            "path": str(f.path),
+            "scope": str(f.scope),
+            "mode": str(f.mode),
+            "order": f.order,
+            "lines": f.lines,
+            "bytes": f.bytes,
+            "tokens": f.tokens,
+            "notes": list(f.notes),
+            "paths": f.paths,
+            "imported_by": str(f.imported_by) if f.imported_by else None,
+            "external": f.external,
+        }
+        for f in files
+    ]
+    memory_found = memory_path.is_dir()
+
     if output_json:
-        print(json.dumps(asdict(report), indent=2, default=str))
+        data = asdict(report)
+        data["files"] = file_entries
+        data["totals"] = asdict(context_totals)
+        data["unverified"] = unverified
+        data["memory_directory"] = {"path": str(memory_path), "found": memory_found}
+        print(json.dumps(data, indent=2, default=str))
         return
 
     # Pretty print report
     print("=" * 60)
     print("  CLAUDE.md Optimization Analysis Report")
     print("=" * 60)
+    print()
+
+    if not files:
+        print(f"  No instruction files found for {project_dir}.")
+        print(f"  Memory directory: {memory_path}" + ("" if memory_found else " (not found)"))
+        return
+
+    print("  Context load (estimated tokens):")
+    print(f"    Always-on:   ~{context_totals.always}")
+    print(f"    Conditional: ~{context_totals.conditional}")
+    print(f"    On demand:   ~{context_totals.on_demand}")
+    print()
+    for entry in file_entries:
+        print(
+            f"    {entry['mode']:<12} {entry['scope']:<13} "
+            f"{entry['lines']:>5} lines  ~{entry['tokens']:>5} tokens  {entry['path']}"
+        )
+        for note in entry["notes"]:
+            print(f"        note: {note}")
+    print()
+    print(f"  Memory directory: {memory_path}" + ("" if memory_found else " (not found)"))
+    if unverified:
+        print(f"  Unverified limits: {', '.join(unverified)}")
     print()
 
     def print_file_section(title: str, analysis: FileAnalysis):
@@ -745,18 +723,6 @@ def main():
     print(f"  TOTALS: {report.total_lines} lines | ~{report.total_estimated_tokens} tokens")
     print()
 
-    # Session cost
-    print(f"  SESSION COST ESTIMATE:")
-    print(f"    Per request: ~{report.session_cost_per_request} tokens (injected into every API call)")
-    print(f"    After 30 turns: ~{report.session_cost_30_turns:,} tokens (accumulated in message history)")
-    if report.session_cost_per_request > 1500:
-        print(f"    [!] High session cost. Consider reducing total content or using /clear periodically.")
-    elif report.session_cost_per_request > 1000:
-        print(f"    [~] Moderate session cost. Optimization would improve efficiency.")
-    else:
-        print(f"    [OK] Session cost is within efficient range.")
-    print()
-
     # Total language overhead
     total_lang_overhead = sum(
         a.token_overhead_from_language
@@ -764,8 +730,7 @@ def main():
         if a and a.exists
     )
     if total_lang_overhead > 100:
-        print(f"  LANGUAGE OVERHEAD: ~{total_lang_overhead} extra tokens/request from non-English content")
-        print(f"    Converting to English would save ~{total_lang_overhead * 30 * 2:,} tokens over 30 turns")
+        print(f"  LANGUAGE OVERHEAD: ~{total_lang_overhead} extra tokens from non-English content")
         print()
 
     # Thresholds

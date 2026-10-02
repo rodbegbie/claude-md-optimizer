@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 from claude_md.discovery import discover
 from claude_md.model import LoadMode, Scope
@@ -321,3 +323,66 @@ def test_diamond_loads_once_without_circular_note(layout):
     files = imports(root, discover(project, home))
     assert [f.path.name for f in files] == ["a.md", "c.md", "b.md"]
     assert all(f.notes == [] for f in files)
+
+
+def chain_of_eight(project, selection):
+    write(project / "CLAUDE.md", "".join(f"@f{k}.md\n" for k in selection))
+    for i in range(1, 8):
+        write(project / f"f{i}.md", f"@f{i + 1}.md\n")
+    write(project / "f8.md")
+
+
+def predicted(selection):
+    queue = [(f"f{k}.md", 1) for k in selection]
+    best = {}
+    while queue:
+        name, hop = queue.pop(0)
+        if name in best and best[name] <= hop:
+            continue
+        best[name] = hop
+        index = int(name[1:-3])
+        if index < 8:
+            queue.append((f"f{index + 1}.md", hop + 1))
+    return {n for n, h in best.items() if h <= 4}
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        (1, 3, 5),
+        (2, 4, 6),
+        (1, 2, 3, 4),
+        (3, 4, 5, 6),
+        (2, 5, 7),
+        (3, 5, 7),
+        (2, 3, 5, 7, 8),
+    ],
+)
+def test_loaded_set_is_independent_of_import_order(tmp_path, selection):
+    results = []
+    for n, perm in enumerate(itertools.permutations(selection)):
+        root = (tmp_path / str(n)).resolve()
+        home = root / "home"
+        project = root / "proj"
+        home.mkdir(parents=True)
+        chain_of_eight(project, perm)
+        files = found(root, discover(project, home))
+        loaded = imports(root, [f for f in files])
+        names = [f.path.name for f in loaded]
+        assert len(names) == len(set(names))
+        assert set(names) == predicted(selection)
+        assert [f.order for f in files] == list(range(len(files)))
+        results.append({(f.path.name, note) for f in files for note in f.notes})
+    assert all(r == results[0] for r in results)
+
+
+@pytest.mark.parametrize("selection", [(1, 3), (3, 1)])
+def test_shallower_reach_relaxes_uncut_ancestor(layout, selection):
+    root, home, project = layout
+    chain_of_eight(project, selection)
+    files = discover(project, home)
+    names = {f.path.name for f in imports(root, files)}
+    assert names == predicted(selection)
+    assert names == {f"f{i}.md" for i in range(1, 7)}
+    assert by_name(root, files, "f4.md").notes == []
+    assert by_name(root, files, "f6.md").notes == ["import depth limit reached: @f7.md"]

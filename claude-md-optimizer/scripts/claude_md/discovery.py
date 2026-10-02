@@ -43,7 +43,6 @@ class _Loader:
         self.files: list[LoadedFile] = []
         self._seen: set[Path] = set()
         self._imports: dict[Path, tuple[LoadedFile, int]] = {}
-        self._cut: set[Path] = set()
         self._project = project
         self._home = home_dir
 
@@ -74,6 +73,8 @@ class _Loader:
         hop: int,
         chain: tuple[Path, ...],
     ) -> None:
+        importer.notes[:] = [n for n in importer.notes if not n.startswith(DEPTH_NOTE)]
+        child_hop = hop + 1
         for raw_token in _import_tokens(importer.text):
             token = raw_token.rstrip(TRAILING_PUNCTUATION)
             target = self._resolve(importer.path, raw_token)
@@ -85,33 +86,24 @@ class _Loader:
             if key in chain:
                 _note(importer, f"circular import: @{token}")
                 continue
-            if key in self._seen:
-                self._reexpand(key, project_level, hop + 1, chain)
-                continue
-            if hop >= MAX_IMPORT_DEPTH.value:
+            if child_hop > MAX_IMPORT_DEPTH.value:
                 _note(importer, f"{DEPTH_NOTE}: @{token}")
-                self._cut.add(chain[-1])
+                continue
+            if key in self._seen:
+                known = self._imports.get(key)
+                if known is not None and child_hop < known[1]:
+                    self._imports[key] = (known[0], child_hop)
+                    if known[0].mode == LoadMode.ALWAYS:
+                        self._expand(known[0], project_level, child_hop, (*chain, key))
                 continue
             imported = self.add(target, Scope.IMPORT)
             if imported is None:
                 continue
             imported.imported_by = importer.path
             imported.external = project_level and not key.is_relative_to(self._project)
-            self._imports[key] = (imported, hop + 1)
+            self._imports[key] = (imported, child_hop)
             if imported.mode == LoadMode.ALWAYS:
-                self._expand(imported, project_level, hop + 1, (*chain, key))
-
-    def _reexpand(
-        self, key: Path, project_level: bool, hop: int, chain: tuple[Path, ...]
-    ) -> None:
-        known = self._imports.get(key)
-        if known is None or key not in self._cut or hop >= known[1]:
-            return
-        imported = known[0]
-        self._imports[key] = (imported, hop)
-        self._cut.discard(key)
-        imported.notes[:] = [n for n in imported.notes if not n.startswith(DEPTH_NOTE)]
-        self._expand(imported, project_level, hop, (*chain, key))
+                self._expand(imported, project_level, child_hop, (*chain, key))
 
     def _resolve(self, importer: Path, token: str) -> Path | None:
         stripped = token.rstrip(TRAILING_PUNCTUATION)

@@ -1,0 +1,4 @@
+{
+  "must_include": ["stale-reference"],
+  "must_exclude": []
+}

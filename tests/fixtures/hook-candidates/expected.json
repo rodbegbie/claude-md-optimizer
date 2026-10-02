@@ -1,0 +1,4 @@
+{
+  "must_include": ["hook-candidate"],
+  "must_exclude": []
+}

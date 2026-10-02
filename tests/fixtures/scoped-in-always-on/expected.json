@@ -1,0 +1,4 @@
+{
+  "must_include": ["scope-candidate"],
+  "must_exclude": []
+}

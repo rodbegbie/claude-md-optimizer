@@ -12,7 +12,7 @@ CJK_RANGES = [
 
 _FENCE = re.compile(r"^\s*(```|~~~)")
 _PATHS_KEY = re.compile(r"^paths:[ \t]*(.*)$")
-_LIST_ITEM = re.compile(r"^\s+-\s+(.*)$")
+_LIST_ITEM = re.compile(r"^\s*-\s+(.*)$")
 
 
 def is_cjk_char(ch: str) -> bool:
@@ -100,30 +100,70 @@ def _clean_item(item: str) -> str | None:
     return item
 
 
+def _scan(value: str, *, split: bool) -> list[str] | None:
+    pieces: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    depth = 0
+    for i, ch in enumerate(value):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "#" and (i == 0 or value[i - 1].isspace()):
+            break
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                return None
+        elif ch == "," and split and depth == 0:
+            pieces.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    if quote or depth:
+        return None
+    pieces.append("".join(current))
+    return pieces
+
+
 def parse_paths(block: str | None) -> list[str] | None:
     if block is None:
         return None
     lines = block.splitlines()
-    raw_items: list[str] = []
+    raw_items: list[str] | None = []
     for i, line in enumerate(lines):
         match = _PATHS_KEY.match(line)
         if not match:
             continue
         value = match.group(1).strip()
-        if not value:
+        if not value or value.startswith("#"):
+            raw_items = []
             for following in lines[i + 1 :]:
                 item = _LIST_ITEM.match(following)
                 if not item:
                     break
-                raw_items.append(item.group(1))
+                scanned = _scan(item.group(1), split=False)
+                if scanned is None:
+                    return None
+                raw_items.extend(scanned)
         elif value.startswith("["):
-            if not value.endswith("]"):
+            whole = _scan(value, split=False)
+            if whole is None:
                 return None
-            raw_items = value[1:-1].split(",")
+            inner = whole[0].strip()
+            if not inner.endswith("]"):
+                return None
+            raw_items = _scan(inner[1:-1], split=True)
         else:
-            raw_items = value.split(",")
+            raw_items = _scan(value, split=True)
         break
     else:
+        return None
+    if raw_items is None:
         return None
 
     items: list[str] = []

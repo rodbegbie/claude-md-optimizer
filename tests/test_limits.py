@@ -13,6 +13,7 @@ URL = "https://code.claude.com/docs/en/memory"
         (limits.MEMORY_LINES, 200),
         (limits.MEMORY_BYTES, 25 * 1024),
         (limits.MAX_FILE_BYTES, 4 * 1024 * 1024),
+        (limits.MAX_IMPORT_DEPTH, 4),
     ],
 )
 def test_verified_limits(limit, value):
@@ -22,7 +23,6 @@ def test_verified_limits(limit, value):
 
 
 def test_unverified_limits():
-    assert limits.MAX_IMPORT_DEPTH == limits.Limit(5, False, "unverified")
     assert limits.COMBINED_LINES == limits.Limit(0, False, "unverified")
 
 

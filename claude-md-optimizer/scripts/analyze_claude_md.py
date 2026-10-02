@@ -344,14 +344,14 @@ def analyze_file(filepath: str) -> FileAnalysis:
         if analysis.non_english_ratio > 0.5:
             analysis.issues.append(
                 f"Non-English content is {analysis.non_english_ratio:.0%} of text "
-                f"(~{analysis.token_overhead_from_language} extra tokens per request). "
+                f"(~{analysis.token_overhead_from_language} extra tokens). "
                 "Convert instructions to English for 30-50% token savings. "
                 "Keep only domain glossary terms in original language."
             )
         elif analysis.non_english_ratio > 0.2:
             analysis.warnings.append(
                 f"Non-English content is {analysis.non_english_ratio:.0%} of text "
-                f"(~{analysis.token_overhead_from_language} extra tokens per request). "
+                f"(~{analysis.token_overhead_from_language} extra tokens). "
                 "Consider converting to English for better token efficiency."
             )
         else:

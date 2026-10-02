@@ -124,3 +124,29 @@ def test_text_mode_empty_project(tree):
     proc = run_text(root / "project", root / "home")
     assert proc.returncode == 0, proc.stderr
     assert "No instruction files found" in proc.stdout
+
+
+BANNED = [
+    "per request",
+    "every request",
+    "each request",
+    "per turn",
+    "turns",
+    "compound",
+    "session cost",
+]
+
+
+def test_non_english_messages_make_no_per_request_claims(tree, run_cli):
+    cjk = "".join(f"- 请使用中文编写第{i}条说明文档\n" for i in range(20))
+    root = tree({"project/CLAUDE.md": "# Title\n" + cjk})
+    result = run_cli(root / "project")
+    analysis = result["project_claude_md"]
+    messages = analysis["issues"] + analysis["warnings"] + analysis["suggestions"]
+    assert any("Non-English content" in m for m in messages)
+    proc = run_text(root / "project", root / "home")
+    assert proc.returncode == 0, proc.stderr
+    assert "Non-English content" in proc.stdout
+    for text in ("\n".join(messages), proc.stdout):
+        for phrase in BANNED:
+            assert phrase not in text.lower()

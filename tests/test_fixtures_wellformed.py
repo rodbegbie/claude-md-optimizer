@@ -30,11 +30,14 @@ CASES = {
 
 
 def test_every_fixture_is_wellformed():
-    found = (
-        {p.name for p in FIXTURES.iterdir() if p.is_dir()}
-        if FIXTURES.is_dir()
-        else set()
-    )
+    """Checks fixture shape only.
+
+    The legacy analyser cannot emit check ids, so must_include and
+    must_exclude are not run against it here. They are asserted in
+    Phase 2 (plan Task 2.10, test_fixture_expected_ids).
+    """
+    assert FIXTURES.is_dir(), f"fixtures directory missing: {FIXTURES}"
+    found = {p.name for p in FIXTURES.iterdir() if p.is_dir()}
     assert found == CASES
 
     for case in sorted(found):

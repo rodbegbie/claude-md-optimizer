@@ -18,7 +18,9 @@ scenario file holds a fixture, a prompt and a rubric of lines to score.
 4. Do 3 repetitions per scenario. Record each repetition's advice
    verbatim, and score every rubric line.
 5. Record results in a baseline document on the planning branch, not in
-   this repository's main line.
+   this repository's main line. The Phase 0 baseline is
+   `docs/superpowers/baselines/2026-10-02-baseline.md` on branch
+   `planning/claude-md-optimizer-rework`.
 
 ### Setup line used
 

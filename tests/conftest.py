@@ -28,6 +28,12 @@ def tree(tmp_path):
 
 @pytest.fixture
 def run_cli(tmp_path):
+    """Run the analyser with HOME set to tmp_path/home.
+
+    The fake home sits beside the tree built by `tree`, so pass a project
+    subdirectory such as tmp_path / "project", never tmp_path itself, or the
+    fake home is analysed as project content.
+    """
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
 
@@ -36,8 +42,11 @@ def run_cli(tmp_path):
             [sys.executable, str(SCRIPT), str(project), "--json"],
             capture_output=True,
             text=True,
-            check=True,
+            check=False,
             env={**os.environ, "HOME": str(home)},
+        )
+        assert proc.returncode == 0, (
+            f"analyser exited {proc.returncode}:\n{proc.stderr}"
         )
         return json.loads(proc.stdout)
 

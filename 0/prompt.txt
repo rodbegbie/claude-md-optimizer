@@ -583,3 +583,7 @@ OK, mark the PR as ready for review.  This is now linked to Entire Trail #1.
 ---
 
 Address the findings on the trail.
+
+---
+
+commit and push those fixes

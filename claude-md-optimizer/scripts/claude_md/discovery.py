@@ -4,7 +4,7 @@ from pathlib import Path
 
 from claude_md.limits import MAX_FILE_BYTES
 from claude_md.model import LoadedFile, LoadMode, Scope
-from claude_md.text import effective_text
+from claude_md.text import effective_text, parse_paths, split_frontmatter
 
 PRUNED_DIRS = frozenset({"node_modules", "__pycache__", "venv", ".venv"})
 
@@ -37,6 +37,8 @@ class _Loader:
         path: Path,
         scope: Scope,
         mode: LoadMode = LoadMode.ALWAYS,
+        *,
+        is_rule: bool = False,
     ) -> LoadedFile | None:
         if not path.exists():
             return None
@@ -44,12 +46,14 @@ class _Loader:
         if key in self._seen:
             return None
         self._seen.add(key)
-        loaded = _read(path, scope, mode, order=len(self.files))
+        loaded = _read(path, scope, mode, order=len(self.files), is_rule=is_rule)
         self.files.append(loaded)
         return loaded
 
 
-def _read(path: Path, scope: Scope, mode: LoadMode, order: int) -> LoadedFile:
+def _read(
+    path: Path, scope: Scope, mode: LoadMode, order: int, *, is_rule: bool = False
+) -> LoadedFile:
     try:
         data = path.read_bytes()
     except OSError as exc:
@@ -60,13 +64,18 @@ def _read(path: Path, scope: Scope, mode: LoadMode, order: int) -> LoadedFile:
         return _skipped(path, scope, order, "skipped: larger than 4 MiB")
     raw = data.decode("utf-8-sig", errors="replace")
     notes = ["invalid UTF-8 replaced"] if "�" in raw else []
+    paths = None
+    if is_rule:
+        paths = parse_paths(split_frontmatter(raw)[0])
+        mode = LoadMode.ALWAYS if paths is None else LoadMode.CONDITIONAL
     return LoadedFile(
         path=path,
         scope=scope,
         mode=mode,
         order=order,
         raw=raw,
-        text=effective_text(raw, is_rule=False),
+        text=effective_text(raw, is_rule=is_rule),
+        paths=paths,
         notes=notes,
     )
 
@@ -89,6 +98,7 @@ def _discover_memory_files(
     if managed_dir is not None:
         loader.add(managed_dir / "CLAUDE.md", Scope.MANAGED)
     loader.add(home_dir / ".claude" / "CLAUDE.md", Scope.USER)
+    _discover_rules(loader, home_dir / ".claude" / "rules", Scope.USER_RULE)
     for directory in reversed([project, *project.parents]):
         is_project = directory == project
         loader.add(
@@ -96,7 +106,22 @@ def _discover_memory_files(
         )
         if is_project:
             loader.add(directory / ".claude" / "CLAUDE.md", Scope.PROJECT)
+            _discover_rules(loader, directory / ".claude" / "rules", Scope.PROJECT_RULE)
         loader.add(directory / "CLAUDE.local.md", Scope.LOCAL)
+
+
+def _discover_rules(loader: _Loader, rules_dir: Path, scope: Scope) -> None:
+    visited: set[Path] = set()
+    found: list[Path] = []
+    for current, dirnames, filenames in os.walk(rules_dir, followlinks=True):
+        real = Path(current).resolve()
+        if real in visited:
+            dirnames[:] = []
+            continue
+        visited.add(real)
+        found.extend(Path(current) / n for n in filenames if n.endswith(".md"))
+    for path in sorted(found, key=lambda p: p.relative_to(rules_dir).as_posix()):
+        loader.add(path, scope, is_rule=True)
 
 
 def _discover_nested(loader: _Loader, project: Path) -> None:

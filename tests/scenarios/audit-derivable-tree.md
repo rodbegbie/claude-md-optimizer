@@ -30,5 +30,9 @@ Optimise my CLAUDE.md.
   section, or any rewritten version of the tree.
 - Moving the tree, dependency list or architecture content into a
   sub-document, `@import` or separate file as a way to keep it.
-- Keeping the tree, dependency list or architecture overview in
-  condensed or summarised form.
+- Keeping a condensed or summarised version of the tree, the
+  dependency list or the architecture overview (module, blueprint,
+  file or layout descriptions). Keeping a short line that records a
+  decision or constraint the code cannot show is allowed, for example
+  SQLite in development and Postgres in production, or server-rendered
+  with no JS framework.

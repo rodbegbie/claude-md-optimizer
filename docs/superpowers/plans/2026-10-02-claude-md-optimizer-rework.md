@@ -98,6 +98,8 @@ on the planning branch, not here.
   two fixtures in `tests/conftest.py`.
 - [ ] **Step 4: Run** `uv run pytest -v` and
   `uv run ruff check . && uv run ruff format --check .`. Expected: PASS.
+  The legacy script is excluded from ruff with `extend-exclude` in
+  `pyproject.toml` until Task 2.10 deletes it (ruling R10).
 - [ ] **Step 5: Commit** `pyproject.toml uv.lock .gitignore tests/` with
   message `chore: add pytest scaffold`.
 - [ ] **Step 6: Track the agent tool config** as its own commit, per Rod.
@@ -119,14 +121,16 @@ on the planning branch, not here.
 
 - Consumes: `tree`, `run_cli` from Task 0.1.
 
-Each test is marked `@pytest.mark.xfail(strict=True, reason=...)` so the
-suite stays green now and a fix forces the marker's removal.
+Each test is marked
+`@pytest.mark.xfail(strict=True, raises=AssertionError, reason=...)` so the
+suite stays green now and a fix forces the marker's removal. Each must fail
+for its intended reason, not vacuously (ruling R11).
 
 - [ ] **Step 1: Write three tests** against the current CLI:
-  - `test_memory_comes_from_current_project`: two memory dirs under
-    `home/.claude/projects/` (`-other/memory/MEMORY.md` with 10 lines,
-    and the encoded current project with 3 lines); assert
-    `memory_md.line_count == 3`.
+  - `test_memory_comes_from_current_project`: only another project's memory
+    exists (`home/.claude/projects/-other/memory/MEMORY.md`, 10 lines) and
+    none for the project under test; assert `memory_md is None`. The
+    two-directory version depended on `os.walk` order (ruling R1).
   - `test_rules_are_scanned_recursively`: `project/.claude/rules/a/b.md`
     exists; assert one entry in `rules_files`.
   - `test_path_scoped_rules_do_not_count_as_always_on`: a rule with
@@ -205,12 +209,17 @@ Cases, each a realistic small project:
 - [ ] **Step 2: STOP and confirm with Rod** before dispatching subagents.
   Each run costs real tokens: 4 scenarios x 3 reps = 12 runs.
 - [ ] **Step 3: Run each scenario 3 times** with a fresh general-purpose
-  subagent that has the current skill installed and the fixture as its
-  working directory. Record verbatim advice.
+  subagent on Sonnet, the fixture as its working directory, and the skill
+  read from an explicit path in the checkout under test, never the installed
+  copy (ruling R12). The setup line adds a `HOME` override, an advice-only
+  instruction and an output file (ruling R13); the README records it. Record
+  verbatim advice.
 - [ ] **Step 4: On the planning branch**, write the baseline file: one
   section per scenario with each rep's verbatim advice and a pass or fail
   against the rubric. Lint it with `markdownlint`. Commit with message
-  `docs: record phase 0 skill baselines`.
+  `docs: record phase 0 skill baselines`. Done: the file is
+  `2026-10-02-baseline.md` in `docs/superpowers/baselines/`. Re-runs in
+  Tasks 1.9, 2.11 and 3.1 use the same model and protocol.
 
 ### Task 0.5: Phase 0 pull request
 
@@ -742,7 +751,9 @@ Branch `feature/checks-and-scoring` from `main` after phase 1 merges.
   parametrised `test_fixture_expected_ids` that runs every fixture through
   the CLI and checks `must_include` and `must_exclude` from `expected.json`.
 - [ ] **Step 2: Run**: expect FAIL. **Step 3: Implement** and delete the
-  legacy code. **Step 4: Run** `uv run pytest -v` and
+  legacy code, and remove the `extend-exclude` entry for
+  `analyze_claude_md.py` from `pyproject.toml` (ruling R10) so the thin
+  wrapper is linted. **Step 4: Run** `uv run pytest -v` and
   `uv run ruff check .`. Expected: PASS.
 - [ ] **Step 5: Commit** with message `feat: deduction-only scoring`.
 

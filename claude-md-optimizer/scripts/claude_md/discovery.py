@@ -1,7 +1,8 @@
+import json
 import os
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from claude_md.limits import MAX_FILE_BYTES, MAX_IMPORT_DEPTH
 from claude_md.model import LoadedFile, LoadMode, Scope
@@ -11,7 +12,17 @@ PRUNED_DIRS = frozenset({"node_modules", "__pycache__", "venv", ".venv"})
 PROJECT_LEVEL_SCOPES = frozenset(
     {Scope.PROJECT, Scope.ANCESTOR, Scope.LOCAL, Scope.PROJECT_RULE}
 )
-EXPANDING_SCOPES = PROJECT_LEVEL_SCOPES | {Scope.MANAGED, Scope.USER, Scope.USER_RULE}
+EXPANDING_SCOPES = PROJECT_LEVEL_SCOPES | {
+    Scope.MANAGED,
+    Scope.USER,
+    Scope.USER_RULE,
+    Scope.AGENTS,
+}
+CLAUDE_FAMILY = ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md")
+AGENTS_FAMILY = ("AGENTS.md", ".claude/AGENTS.md")
+DORMANT_AGENTS_NOTE = (
+    "AGENTS.md not loaded: a CLAUDE.md exists at or above the working directory"
+)
 TRAILING_PUNCTUATION = ".,;:!?)]}'\""
 DEPTH_NOTE = "import depth limit reached"
 _FENCE = re.compile(r"^\s*(```|~~~)")
@@ -32,19 +43,25 @@ def discover(
     project_dir: Path, home_dir: Path, managed_dir: Path | None = None
 ) -> list[LoadedFile]:
     project = project_dir.resolve()
-    loader = _Loader(project, home_dir)
-    _discover_memory_files(loader, project, home_dir, managed_dir)
-    _discover_nested(loader, project)
+    loader = _Loader(project, home_dir, _read_excludes(project, home_dir))
+    has_claude = any(
+        (directory / name).is_file()
+        for directory in [project, *project.parents]
+        for name in CLAUDE_FAMILY
+    )
+    _discover_memory_files(loader, project, home_dir, managed_dir, has_claude)
+    _discover_nested(loader, project, has_claude)
     return loader.files
 
 
 class _Loader:
-    def __init__(self, project: Path, home_dir: Path) -> None:
+    def __init__(self, project: Path, home_dir: Path, excludes: list[str]) -> None:
         self.files: list[LoadedFile] = []
         self._seen: set[Path] = set()
         self._imports: dict[Path, tuple[LoadedFile, int]] = {}
         self._project = project
         self._home = home_dir
+        self._excludes = excludes
 
     def add(
         self,
@@ -62,9 +79,24 @@ class _Loader:
         self._seen.add(key)
         loaded = _read(path, scope, mode, order=len(self.files), is_rule=is_rule)
         self.files.append(loaded)
+        if scope != Scope.MANAGED:
+            pattern = self._matching_exclude(path, key)
+            if pattern is not None:
+                loaded.mode = LoadMode.EXCLUDED
+                _note(loaded, f"excluded by claudeMdExcludes: {pattern}")
         if scope in EXPANDING_SCOPES and loaded.mode == LoadMode.ALWAYS:
             self._expand(loaded, scope in PROJECT_LEVEL_SCOPES, hop=0, chain=(key,))
         return loaded
+
+    def _matching_exclude(self, path: Path, resolved: Path) -> str | None:
+        candidates = (resolved, PurePath(os.path.abspath(path)))
+        for pattern in self._excludes:
+            expanded = (
+                str(self._home / pattern[2:]) if pattern.startswith("~/") else pattern
+            )
+            if any(candidate.full_match(expanded) for candidate in candidates):
+                return pattern
+        return None
 
     def _expand(
         self,
@@ -183,8 +215,26 @@ def _skipped(path: Path, scope: Scope, order: int, note: str) -> LoadedFile:
     )
 
 
+def _read_excludes(project: Path, home_dir: Path) -> list[str]:
+    merged: dict[str, None] = {}
+    for base in (home_dir, project):
+        for name in ("settings.json", "settings.local.json"):
+            try:
+                data = json.loads((base / ".claude" / name).read_text("utf-8"))
+            except (OSError, ValueError):
+                continue
+            entries = data.get("claudeMdExcludes") if isinstance(data, dict) else None
+            if isinstance(entries, list):
+                merged.update((e, None) for e in entries if isinstance(e, str))
+    return list(merged)
+
+
 def _discover_memory_files(
-    loader: _Loader, project: Path, home_dir: Path, managed_dir: Path | None
+    loader: _Loader,
+    project: Path,
+    home_dir: Path,
+    managed_dir: Path | None,
+    has_claude: bool,
 ) -> None:
     if managed_dir is not None:
         loader.add(managed_dir / "CLAUDE.md", Scope.MANAGED)
@@ -192,6 +242,14 @@ def _discover_memory_files(
     _discover_rules(loader, home_dir / ".claude" / "rules", Scope.USER_RULE)
     for directory in reversed([project, *project.parents]):
         is_project = directory == project
+        for name in AGENTS_FAMILY:
+            path = directory / name
+            if has_claude:
+                dormant = loader.add(path, Scope.AGENTS, LoadMode.DORMANT)
+                if dormant is not None:
+                    _note(dormant, DORMANT_AGENTS_NOTE)
+            else:
+                loader.add(path, Scope.AGENTS)
         loader.add(
             directory / "CLAUDE.md", Scope.PROJECT if is_project else Scope.ANCESTOR
         )
@@ -215,10 +273,22 @@ def _discover_rules(loader: _Loader, rules_dir: Path, scope: Scope) -> None:
         loader.add(path, scope, is_rule=True)
 
 
-def _discover_nested(loader: _Loader, project: Path) -> None:
+def _discover_nested(loader: _Loader, project: Path, has_claude: bool) -> None:
+    agents: list[Path] = []
     for current, dirnames, filenames in os.walk(project):
         dirnames[:] = sorted(
             d for d in dirnames if not d.startswith(".") and d not in PRUNED_DIRS
         )
-        if Path(current) != project and "CLAUDE.md" in filenames:
-            loader.add(Path(current) / "CLAUDE.md", Scope.NESTED, LoadMode.ON_DEMAND)
+        directory = Path(current)
+        if directory == project:
+            continue
+        if "CLAUDE.md" in filenames:
+            loader.add(directory / "CLAUDE.md", Scope.NESTED, LoadMode.ON_DEMAND)
+        if (
+            not has_claude
+            and "AGENTS.md" in filenames
+            and not any((directory / name).is_file() for name in CLAUDE_FAMILY)
+        ):
+            agents.append(directory / "AGENTS.md")
+    for path in agents:
+        loader.add(path, Scope.AGENTS, LoadMode.ON_DEMAND)

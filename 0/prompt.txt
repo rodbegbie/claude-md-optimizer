@@ -1,0 +1,1 @@
+This is the repo of a Claude skill I find useful which updates CLAUDE.md files to be more efficient.  It's been 7 or 8 months since the author last updated it. Can you take a look and see if there's ways we can improve it?  You'll probably have to search the web to find new best practices, so use context-mode for help with that.

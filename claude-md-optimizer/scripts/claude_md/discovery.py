@@ -13,6 +13,7 @@ PROJECT_LEVEL_SCOPES = frozenset(
 )
 EXPANDING_SCOPES = PROJECT_LEVEL_SCOPES | {Scope.MANAGED, Scope.USER, Scope.USER_RULE}
 TRAILING_PUNCTUATION = ".,;:!?)]}'\""
+DEPTH_NOTE = "import depth limit reached"
 _FENCE = re.compile(r"^\s*(```|~~~)")
 _CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
 _IMPORT = re.compile(r"(?<!\S)@(\S+)")
@@ -41,6 +42,8 @@ class _Loader:
     def __init__(self, project: Path, home_dir: Path) -> None:
         self.files: list[LoadedFile] = []
         self._seen: set[Path] = set()
+        self._imports: dict[Path, tuple[LoadedFile, int]] = {}
+        self._cut: set[Path] = set()
         self._project = project
         self._home = home_dir
 
@@ -76,24 +79,39 @@ class _Loader:
             target = self._resolve(importer.path, raw_token)
             if target is None:
                 if _looks_like_path(token):
-                    importer.notes.append(f"import target missing: @{token}")
+                    _note(importer, f"import target missing: @{token}")
                 continue
             key = target.resolve()
             if key in chain:
-                importer.notes.append(f"circular import: @{token}")
+                _note(importer, f"circular import: @{token}")
                 continue
             if key in self._seen:
+                self._reexpand(key, project_level, hop + 1, chain)
                 continue
             if hop >= MAX_IMPORT_DEPTH.value:
-                importer.notes.append(f"import depth limit reached: @{token}")
+                _note(importer, f"{DEPTH_NOTE}: @{token}")
+                self._cut.add(chain[-1])
                 continue
             imported = self.add(target, Scope.IMPORT)
             if imported is None:
                 continue
             imported.imported_by = importer.path
             imported.external = project_level and not key.is_relative_to(self._project)
+            self._imports[key] = (imported, hop + 1)
             if imported.mode == LoadMode.ALWAYS:
                 self._expand(imported, project_level, hop + 1, (*chain, key))
+
+    def _reexpand(
+        self, key: Path, project_level: bool, hop: int, chain: tuple[Path, ...]
+    ) -> None:
+        known = self._imports.get(key)
+        if known is None or key not in self._cut or hop >= known[1]:
+            return
+        imported = known[0]
+        self._imports[key] = (imported, hop)
+        self._cut.discard(key)
+        imported.notes[:] = [n for n in imported.notes if not n.startswith(DEPTH_NOTE)]
+        self._expand(imported, project_level, hop, (*chain, key))
 
     def _resolve(self, importer: Path, token: str) -> Path | None:
         stripped = token.rstrip(TRAILING_PUNCTUATION)
@@ -134,6 +152,11 @@ def _read(
         paths=paths,
         notes=notes,
     )
+
+
+def _note(file: LoadedFile, note: str) -> None:
+    if note not in file.notes:
+        file.notes.append(note)
 
 
 def _import_tokens(text: str) -> list[str]:

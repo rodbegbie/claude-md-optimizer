@@ -282,3 +282,42 @@ def test_oversized_import_is_skipped(layout):
     files = imports(root, discover(project, home))
     assert [f.mode for f in files] == [LoadMode.SKIPPED]
     assert files[0].notes == ["skipped: larger than 4 MiB"]
+
+
+def chain_of_six(project, root_lines):
+    write(project / "CLAUDE.md", root_lines)
+    for i in range(1, 6):
+        write(project / f"f{i}.md", f"@f{i + 1}.md\n")
+    write(project / "f6.md")
+
+
+@pytest.mark.parametrize("lines", ["@f1.md\n@f4.md\n", "@f4.md\n@f1.md\n"])
+def test_shallower_reach_expands_depth_limited_file(layout, lines):
+    root, home, project = layout
+    chain_of_six(project, lines)
+    files = discover(project, home)
+    names = [f.path.name for f in imports(root, files)]
+    assert sorted(names) == [f"f{i}.md" for i in range(1, 7)]
+    assert len(names) == len(set(names))
+    assert by_name(root, files, "f4.md").notes == []
+    assert [f.order for f in files] == list(range(len(files)))
+
+
+def test_deep_reach_after_shallow_does_not_reexpand(layout):
+    root, home, project = layout
+    chain_of_six(project, "@f4.md\n@f1.md\n")
+    files = discover(project, home)
+    names = [f.path.name for f in imports(root, files)]
+    assert names == ["f4.md", "f5.md", "f6.md", "f1.md", "f2.md", "f3.md"]
+    assert all(f.notes == [] for f in imports(root, files))
+
+
+def test_diamond_loads_once_without_circular_note(layout):
+    root, home, project = layout
+    write(project / "CLAUDE.md", "@a.md\n@b.md\n")
+    write(project / "a.md", "@c.md\n")
+    write(project / "b.md", "@c.md\n")
+    write(project / "c.md")
+    files = imports(root, discover(project, home))
+    assert [f.path.name for f in files] == ["a.md", "c.md", "b.md"]
+    assert all(f.notes == [] for f in files)

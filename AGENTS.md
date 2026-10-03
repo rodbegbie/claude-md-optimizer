@@ -79,13 +79,26 @@ reports all of them.
   around blocks).
 - Phase plans, specs and baselines live only on branch
   `planning/claude-md-optimizer-rework`. Never merge them to `main`.
-- Work is phased, and each phase ends in a draft PR to `main` on the fork. Pass
-  `--repo rodbegbie/claude-md-optimizer` to `gh`, because it defaults to
-  upstream.
+- Work is phased, and each phase ends in a draft PR to `main` on the fork (see
+  "GitHub: fork only" below).
 - `git push` runs Entire's hook. The first branch push is often rejected;
   confirm the remote did not move, retry once, and never force.
 - `.claude/`, `.codex/` and `.entire/` configs are tracked and belong to the
   Entire integration. `.agent-traces/` and `.private-journal/` are not.
+
+## GitHub: fork only
+
+- Every GitHub interaction MUST happen on Rod's fork,
+  `rodbegbie/claude-md-optimizer`. That covers PRs, issues, comments, reviews,
+  labels, releases and repo settings.
+- NEVER open a PR or an issue, or post anything else, on the upstream repo
+  (`geuneda/claude-md-optimizer`). This work is fork-only and is not for
+  upstream.
+- Always pass `--repo rodbegbie/claude-md-optimizer` to `gh`, because `gh`
+  defaults to upstream after forking. Check the target repo before any `gh`
+  command that writes.
+- The `upstream` remote is read-only. Never push to it. Push branches to
+  `origin` and open PRs against `main` on the fork.
 
 <!-- entire-agent:begin -->
 Read .entire/agent-guide.md for this repository's workflow, source inspection, and verification guidance.

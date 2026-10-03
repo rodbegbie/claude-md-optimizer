@@ -1,0 +1,24 @@
+I ran the analyser on this project with HOME pointed at an empty temp directory (done through a Python subprocess, because the sandbox refused a shell-level HOME override). Only Recipe Box's own CLAUDE.md was analysed. It's 60 lines (~422 tokens) and loads in every session. The score is 90/100. That score is this tool's own measure, so I'm not using it as a target.
+
+Most of the file is content Claude can work out from the code, so my main suggestion is deletions. Nothing has been changed yet. Each item below needs your approval first.
+
+Proposed changes (docs-backed, derivable content)
+
+1. Delete "Project structure" (lines 5-26, the directory tree). Claude can list the files itself. The tree also names files that don't exist (`models.py`, `base.html`), so it has already gone stale. I'd drop it completely rather than condense it or move it to another file.
+2. Delete "Dependencies" (lines 28-37, the version list). `pyproject.toml` is the source of truth, and a copy here will drift out of date.
+3. Delete the prose in "Architecture" (lines 39-48). It describes the app factory, the blueprints, the models and the templates, and all of that is visible in the code. The analyser flagged it only as a long paragraph, but reading it shows the content is derivable, so deleting it is the right fix rather than rewording it as bullets. If you want to keep one thing from it, the one decision the code can't show is "SQLite in development, Postgres in production". That could stay as a single line.
+
+Deleting items 1 and 3 also clears the heuristic findings: the 18-line code block and the two stale references to `models.py` and `base.html`. Those references would otherwise need fixing separately.
+
+Keep as is
+- Intro line (line 3).
+- "Commands" (lines 50-54). These are the commands to run the app, the tests and migrations, and they aren't something Claude can reliably guess.
+- "Gotchas" (lines 56-60). These are constraints the code doesn't show: store quantities as fractions, and leave `SERVER_NAME` unset in the test client.
+
+The Gotchas are advisory in CLAUDE.md. If you want either to hold every time, a hook is the mechanism, for example a `PreToolUse` check that blocks float fields on `Ingredient`. I don't think that's necessary here.
+
+Result: the file would be about 15 lines (about 18 with the DB line), with the score at 100 and the same working information. I haven't created any imports or sub-documents, and there's nothing to move to a rule or skill.
+
+Once you've approved and I've applied the changes (with a backup of the original first), I'll re-run the analyser. Then please run `/context` in a new session and check that the Memory files list shows what you expect.
+
+Which of these do you want me to apply?

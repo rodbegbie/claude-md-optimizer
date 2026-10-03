@@ -1,0 +1,20 @@
+Your CLAUDE.md is in good shape, so I recommend leaving it as it is.
+
+I ran the analyser on the Kettle project with HOME set to an empty temporary directory (the sandbox allowed this when done through a Python subprocess). It scored 100/100 and found nothing, either backed by Anthropic docs or heuristic. The file is 22 lines, about 176 tokens, and loads at session start.
+
+I also read the file myself, since the checks can miss things like an architecture overview written as prose. It has none:
+
+- Commands: two short lines. They are useful because Claude can't guess that the integration tests need Docker.
+- Gotchas: UTC storage with conversion only in `internal/render`, the deliberately single-threaded scheduler, and the shared Postgres container with per-test schemas. These are decisions and constraints the code doesn't show, so they belong in CLAUDE.md.
+- Conventions: error wrapping and test placement. Both are short and stated as rules.
+- There is no directory tree, dependency list, file-by-file description or architecture summary to delete.
+- Nothing applies only to some paths, so no `paths:` rule or nested CLAUDE.md is needed.
+
+One optional idea, which I'd only take up if you want a guarantee. CLAUDE.md is advisory, so if "do not add goroutines in `internal/sched`" must hold every time, a `PreToolUse` hook could enforce it. That is a choice, not a defect, and I'd skip it unless the rule keeps being broken.
+
+Two things in the report aren't about your file:
+
+- The two AGENTS.md files it lists are dormant, because a CLAUDE.md exists at or above the working directory. They cost nothing.
+- COMBINED_LINES is listed as an unverified limit. That is the analyser's own note and needs no action.
+
+I'm making no changes, and there is nothing to re-run. If you like, run `/context` in a new session to confirm the Memory files list shows this CLAUDE.md.

@@ -1,0 +1,22 @@
+Short answer: the import is not saving you any context, and the CLAUDE.md text that says it does is wrong. I haven't changed any files.
+
+What I found (the analyser scored it 97/100; I also read both files):
+
+- CLAUDE.md lines 13-14 say the conventions were split out "to save context" and that "Claude loads it on demand when it is relevant". That is incorrect. An `@docs/conventions.md` import loads at session start, together with CLAUDE.md. Both files are always-on: about 138 tokens for CLAUDE.md plus about 1,312 for docs/conventions.md, so about 1,450 in total. Splitting a file into imports only reorganises it.
+- CLAUDE.md line 21 refers to `ledgerly/parsers/`, which doesn't exist under this project directory. That may be fine if the code lives elsewhere, but check it and update or remove the line if it is stale. This is only the tool's heuristic.
+
+What I would suggest, each of which you can decline:
+
+1. Fix the wording (lines 13-14). Replace the claim with something true, for example "Detailed conventions live in docs/conventions.md." Keep the `@docs/conventions.md` import if you like having the file separate for readability. Just don't expect it to shrink anything. I'd change only those two lines.
+2. If you do want less loaded at the start of each session, move the path-specific sections into `.claude/rules/` files with `paths:` frontmatter. Those load only when Claude works on matching files. The best candidates in conventions.md are:
+   - Parsing: `ledgerly/parsers/**`, once you've confirmed the real path.
+   - Testing: `tests/**`.
+   - CLI: `ledgerly/cli.py`.
+   - Reports: whichever module holds them.
+
+   Move those sections verbatim, then remove them from the imported file so nothing is duplicated. Naming, Money, Errors, Git, Typing, Style, Security and the rest apply everywhere, so they should stay always-on. Doing this for all four candidates would cut roughly a third of the 1,312 tokens, but the saving is modest. At about 1,450 tokens in total, nothing here is large, so leaving the file as it is is also reasonable once the wording is fixed.
+3. Don't create further imports or sub-documents to cut context. They load at launch just like this one.
+4. Some rules in conventions.md are written as rules but need to hold every time. CLAUDE.md is advisory, so a hook is the only thing that enforces them. Examples are `ruff format` (Style) and `mypy --strict` (Typing, currently CI only). A `PostToolUse` hook that runs the formatter after an edit would enforce formatting, and then the Style line could go. This is optional.
+5. Some lines are things Claude can see for itself, such as "Commands live in `ledgerly/cli.py` using `argparse`." You could delete those, but only if you approve each deletion.
+
+Whatever you approve, I'd back up the files first, move text word for word, and re-run the analyser afterwards. Then run `/context` in a fresh session to check that the memory files list is what you expect.

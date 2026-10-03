@@ -1,0 +1,24 @@
+I ran the analyser on the project with HOME set to an empty temporary directory (the override worked), so only this project's CLAUDE.md was analysed. It is 22 lines, about 175 tokens, always loaded. Score: 93/100. Nothing has been changed.
+
+To make Claude always do these, CLAUDE.md is the wrong tool. It is context, not enforced configuration, and no wording such as "Always" or "Never" guarantees Claude follows it. Only a hook runs every time. The analyser flagged four lines in the Workflow section as must-happen rules (docs-backed), and I'd add a fifth it missed.
+
+Proposed hooks (in .claude/settings.json), each tied to a named line:
+
+1. Line 12, "Always run `ruff check` after each edit": a PostToolUse hook on Edit|Write that runs `ruff check` on the edited file. Failures go back to Claude straight away.
+2. Line 13, "Always run `ruff format` before finishing a task": either a PostToolUse hook that runs `ruff format` on the edited file (simplest, and it also covers "after each edit"), or a Stop hook that runs `ruff format --check` and blocks finishing if it fails.
+3. Line 14, "Never commit without running `pytest` first" and line 16, "Run `mypy tidepool` before every commit": one PreToolUse hook on Bash that matches `git commit`, runs `uv run pytest` and `mypy tidepool`, and blocks the commit (exit code 2) if either fails. This makes both rules true by construction rather than by memory.
+4. Line 15, "Never edit files under `tidepool/_generated/`; regenerate them instead": a PreToolUse hook on Edit|Write that blocks any path under that directory. The block message should say to regenerate instead. The analyser didn't flag this line, but it is the clearest case for a hook.
+
+Once the hooks are in, I would then do one of two things with each line, your call:
+- Delete lines 12, 13, 14 and 16, since the hook now does the work. Or
+- Keep them as one-line guidance so Claude knows why a hook is blocking it.
+
+I'd keep line 15 as a short note on how to regenerate, since the hook only blocks and doesn't say how.
+
+Other findings (heuristic, so feel free to decline):
+- Line 15 refers to `tidepool/_generated` and line 21 to `tidepool/parsers`. Neither path exists under the project directory. If this is only a trimmed copy of the repo, ignore it. If the layout has changed, update or remove the references. Otherwise Claude will be pointed at paths that aren't there. The hook matcher in item 4 needs the real path.
+- Line 21 ("Each harbour authority gets its own parser class in `tidepool/parsers/`") describes structure Claude can read from the code, so it's a candidate for deletion with your approval. The other Design notes (UTC storage, parsers never print or log) record constraints the code can't show, so keep them.
+
+Everything else (the project description and the Commands section) is fine as it is.
+
+If you want, I can draft the exact hook JSON and the small scripts for them. I'd apply nothing until you approve, and I'd back up CLAUDE.md first. After that I'd re-run the analyser and ask you to run `/context` in a new session to check the memory files list.

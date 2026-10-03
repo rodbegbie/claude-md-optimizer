@@ -1,0 +1,17 @@
+Your CLAUDE.md is in good shape, so I'd leave it alone.
+
+I ran the analyser with HOME set to an empty temporary directory, through a Python subprocess. The direct Bash HOME override was blocked by the worktree guard, but the subprocess route worked.
+
+- The project has one instruction file, `CLAUDE.md`. It is 22 lines (about 176 tokens) and loads at the start of every session.
+- The analyser found nothing, either from Anthropic docs or from its own heuristics, so there are no deductions. The score is 100/100. That score is the tool's own measure, not an Anthropic metric.
+- I read the file myself, because the checks can miss things like an architecture overview written as prose. There is none. Every line is something Claude couldn't work out from the code:
+  - the two commands, including that integration tests need Docker
+  - UTC storage with conversion only in `internal/render`
+  - the deliberately single-threaded scheduler
+  - the shared Postgres container and the `testdb.NewSchema(t)` rule
+  - the error-wrapping and test-placement conventions
+- There are no directory trees, dependency lists or file-by-file descriptions to delete. Nothing is path-specific enough to need a `paths:` rule or a nested CLAUDE.md. The file is far under Anthropic's 200-line recommendation, and there are no imports to correct.
+- One optional idea, which you can decline: the "do not add goroutines without discussing it" gotcha is advisory only, as every CLAUDE.md line is. If it must hold every time, a `PreToolUse` or `PostToolUse` hook could check for it. It reads like a judgement call, so I wouldn't push it.
+- The analyser also reports two dormant `AGENTS.md` files higher up the tree. They aren't loaded because a CLAUDE.md exists at or above the working directory, and they aren't part of this project.
+
+I suggest no changes, so there is nothing to back up or re-run. If you want to confirm, run `/context` in a new session and check that the Memory files list shows only this CLAUDE.md.

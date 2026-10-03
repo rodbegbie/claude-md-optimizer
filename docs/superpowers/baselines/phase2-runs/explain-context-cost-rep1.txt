@@ -1,0 +1,33 @@
+Short answer: your project context is not very big. Your project CLAUDE.md is the only thing that loads at session start, and it comes to about 2,800 tokens (260 lines). The only docs-backed issue is that it is 60 lines over Anthropic's recommended 200 lines per file.
+
+What loads, from the analyser (run with an empty HOME, so your personal ~/.claude files and memory are not counted):
+
+- Always loaded at session start: tests/fixtures/oversized/project/CLAUDE.md, about 2,801 tokens. This is the whole always-on total.
+- Conditional (path-scoped rules, nested CLAUDE.md): 0 tokens. On demand (skills): 0 tokens.
+- Two AGENTS.md files (about 1,000 tokens each) are dormant. They are not loaded because a CLAUDE.md exists at or above the working directory, so they cost nothing.
+- No auto memory directory was found under the empty HOME. Your real MEMORY.md, user-level CLAUDE.md and ~/.claude/rules files would add to this and are not in these numbers. Run /context in a real session to see them.
+
+This loads once at session start. It is not a cost that repeats on every request.
+
+Findings:
+
+- Docs-backed (size-file, warning): CLAUDE.md is 260 lines against the recommended 200.
+- Heuristic, so take these as suggestions you can decline:
+  - no-trigger: a long file with no "read X when modifying Y" lines.
+  - stale-reference: 15 backticked paths and names (for example api/, db/queries, tests/factories.py, settings/production.py, flags.py, tasks.py, docs/payments.md) were not found under the project directory. If this is a trimmed fixture, that is expected. In a real repo, either update those references or remove them.
+- Score: 92/100. It only goes down from 100, and it is this tool's own measure, not an Anthropic metric, so don't chase it.
+
+I read the whole file. Almost every line is a project rule or decision that the code cannot show (capacity locking, refund and pricing policy, migration and task conventions, who can do what in the admin). That is the kind of content that belongs in CLAUDE.md, so I would not delete it wholesale. Where I would look, in order of usefulness:
+
+1. Move area-specific sections into path-scoped rules (.claude/rules/*.md with paths: frontmatter). They then load only when Claude touches matching files. Good candidates, by section name:
+   - Frontend (lines 133-144): templates and static files.
+   - Database (81-92): migrations and db/.
+   - Testing (94-105): test files.
+   - Reports (236-245), Manifests (203-212) and Staff admin (192-201): the matching app directories.
+   - Background tasks (214-223) and Logging (225-234) are also candidates.
+   Move the text verbatim and keep anything that applies to every session in CLAUDE.md. This is the one change that cuts the always-on size. Roughly 100 of the 260 lines are in those sections, which would bring you under 200 lines.
+2. The Overview (lines 3-7) is partly derivable from the code, and Local setup (247-256) overlaps the Commands section. `docker compose up db redis` appears at both line 15 and line 251. A single line recording a decision may stay. Anything Claude can read from the repo can be deleted with your approval.
+3. For rules that must hold every time, such as "uv run ruff check --fix ." or "makemigrations --check", a hook (PostToolUse after edits) is more reliable than a CLAUDE.md line, which is only advisory.
+4. Don't split the file into @imports to shrink it. Imports load at launch with the parent file, so that only reorganises the same tokens.
+
+Nothing has been changed. If you want, tell me which sections to move and I will propose the exact paths: globs and a before/after for each, and apply them only on your approval.

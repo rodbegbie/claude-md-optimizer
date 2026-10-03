@@ -1,0 +1,21 @@
+I ran the analyser on the Tidepool project with HOME set to an empty temporary directory. The override worked. Only this project's CLAUDE.md was analysed (22 lines, about 175 tokens, always loaded). Score: 93/100. I have not changed any files.
+
+You asked for Claude to always do these things. A CLAUDE.md line can't guarantee that. It is context that Claude usually follows, and no wording or emphasis makes it certain. Only a hook runs every time. The five lines under "Workflow" are rules that have to hold every time, so I'd enforce them with hooks in `.claude/settings.json` and keep CLAUDE.md for guidance.
+
+Proposed hooks, each against a named line:
+
+1. Line 12, "Always run `ruff check` after each edit". Add a `PostToolUse` hook on `Edit|Write|MultiEdit` that runs `ruff check` on the edited file. If it reports problems, the hook exits with code 2 so Claude sees the output and fixes it.
+2. Line 13, "Always run `ruff format` before finishing a task". Add a `Stop` hook that runs `ruff format`. It can alternatively be a `PostToolUse` hook that formats after every edit, which is simpler and means "finishing" never matters. Your call.
+3. Line 14, "Never commit without running `pytest` first". Add a `PreToolUse` hook on `Bash` that matches `git commit`, runs `uv run pytest`, and blocks the commit (exit code 2) if the tests fail.
+4. Line 16, "Run `mypy tidepool` before every commit". Put this in the same `PreToolUse` commit hook as line 14, running `mypy tidepool` as well.
+5. Line 15, "Never edit files under `tidepool/_generated/`". The analyser did not flag this one as a hook candidate, but it is a rule of the same kind. Add a `PreToolUse` hook on `Edit|Write|MultiEdit` that blocks any path under `tidepool/_generated/`. The "regenerate them instead" part is guidance, so keep that short sentence in CLAUDE.md as the hook's explanation.
+
+Once a hook is in place, the matching CLAUDE.md line is redundant. I'd delete lines 12, 13, 14 and 16 with your approval. For line 15, keep the "regenerate them instead" note. Until the hooks exist, the lines in CLAUDE.md are only advisory.
+
+I can draft the exact `settings.json` entries and the small hook scripts if you want them. I'd write them for review rather than applying them straight away.
+
+Two smaller findings, both heuristic suggestions you can decline:
+
+- Line 15 refers to `tidepool/_generated`, and line 21 refers to `tidepool/parsers`. The analyser could not find either path under the project directory. This directory holds only the CLAUDE.md, so they may be fine in your real repository. If they have been renamed or removed, update or delete the references. Line 21 is a design note about where parsers live, and it is the only place that records the "one parser class per harbour authority" decision.
+
+Everything else is in good shape. The Commands and Design notes sections are short and record constraints the code doesn't show (UTC storage, parsers never print or log). I would leave them as they are.

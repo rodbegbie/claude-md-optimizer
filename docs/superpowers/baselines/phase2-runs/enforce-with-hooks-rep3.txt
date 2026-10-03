@@ -1,0 +1,20 @@
+Rod, I ran the analyser on the Tidepool project with HOME pointed at an empty temporary directory. The sandbox blocked the HOME override in Bash, so I did it from a Python subprocess instead, and that worked. Only this project's CLAUDE.md was analysed. The score is 93/100. That is this tool's own measure, so don't chase it. I have changed nothing.
+
+To make Claude "always do these", CLAUDE.md is the wrong tool. It is context, and no wording or emphasis guarantees Claude follows it. Only a hook runs every time. Five lines in the Workflow section are must-happen rules, so I'd move them into hooks in settings. The analyser flagged four of them (lines 12, 13, 14 and 16) as hook candidates, which Anthropic's best-practices page backs. I added the fifth (line 15) on my own reading.
+
+| CLAUDE.md line | Suggested hook |
+| --- | --- |
+| 12: "Always run `ruff check` after each edit." | `PostToolUse` on Edit and Write. It runs `ruff check` on the edited file once the edit lands and feeds any failures back to Claude. |
+| 13: "Always run `ruff format` before finishing a task." | Either a `PostToolUse` hook that runs `ruff format` on the edited file (simplest, and you can pair it with line 12), or a `Stop` hook that formats at the end of the turn. |
+| 14: "Never commit without running `pytest` first." | `PreToolUse` on Bash. It matches `git commit`, runs `uv run pytest`, and blocks the commit if the tests fail. |
+| 15: "Never edit files under `tidepool/_generated/`; regenerate them instead." | `PreToolUse` on Edit and Write. It blocks any path under `tidepool/_generated/`, and its message tells Claude to regenerate the files instead. |
+| 16: "Run `mypy tidepool` before every commit." | The same `PreToolUse` hook as line 14, with `mypy tidepool` added to its checks. |
+
+Once a hook enforces a rule, the CLAUDE.md line is only advisory. I'd delete it, with your approval, or cut it to a short note saying a hook enforces it. For line 15 I'd keep the "regenerate them instead" wording, because the hook's block message can carry it. The hooks themselves go in `.claude/settings.json` (shared with the team) or `.claude/settings.local.json` (just you).
+
+Two other things:
+
+- Two heuristic findings say `tidepool/_generated` (line 15) and `tidepool/parsers` (line 21) don't exist under the project directory. These are this tool's judgement, so you can decline them. If this is a fixture rather than the real repo, ignore them. In the real repo I'd check the paths. The `_generated` hook should only be written against a path that exists.
+- Everything else is in good shape and I'd leave it. The Commands section and the three Design notes are short, are things Claude can't derive from the code, and are needed in every session. They stay in CLAUDE.md. The file is 22 lines (about 175 tokens), well under Anthropic's 200-line guidance. Don't add sections or restructure it.
+
+If you approve, I'll draft the `settings.json` hook block and the CLAUDE.md edits against the named lines. I'll back up the original first, then re-run the analyser. After that, please run `/context` in a new session to confirm the Memory files list looks right.

@@ -1,0 +1,23 @@
+I ran the analyser on the project (with HOME pointed at an empty temp directory, which worked). It scored 97/100 and found two things. Nothing has been changed.
+
+Both files load at the start of every session:
+- CLAUDE.md: 21 lines, about 138 tokens.
+- docs/conventions.md: 153 lines, about 1,312 tokens. It loads because CLAUDE.md imports it with `@docs/conventions.md`.
+- That is about 1,450 tokens in total, which is small.
+
+**1. The import does not save context (CLAUDE.md, lines 12-13). The analyser backs this with Anthropic's docs.**
+- The text says "I split them into an imported file to save context. Claude loads it on demand when it is relevant." Both halves are wrong. An `@path` import loads at launch, together with the file that imports it. Splitting the file only reorganises it. It does not shrink what Claude sees.
+- Proposed change: reword those two lines so they stop claiming a saving, for example "Conventions live in a separate file for readability; it loads with this one." Keep the `@docs/conventions.md` line itself if you like the layout. Keeping the import is fine; just don't count on it to save tokens.
+- I'd also say no further splitting or new sub-documents are worth doing. 1,450 tokens is well under Anthropic's 200-lines-per-file guidance for CLAUDE.md, and conventions.md is a single coherent list of short rules.
+
+**2. Stale reference (CLAUDE.md, line 21). This is a heuristic finding, so decline it if it's wrong.**
+- "each parser lives in `ledgerly/parsers/`" points at a path the analyser couldn't find under the project directory. This fixture contains only the two markdown files, so it may be a false alarm. If the real repo has moved or renamed that directory, update the line. If it exists, leave the line alone.
+
+**Things I noticed on reading both files. These are optional and each needs your approval.**
+- Hooks: some rules must hold every time, and the lines alone are only advisory. "Format with `ruff format`" and "Run `mypy --strict` on `ledgerly/`" are good candidates. A `PostToolUse` hook could run `uv run ruff format` after each edit. The mypy rule is already described as a CI check, so CI covers it.
+- Derivable content: a few lines in conventions.md describe what the code or tooling already shows, such as "Format with `ruff format`" appearing in both CLAUDE.md and conventions.md. That is only a minor duplication. If you want it trimmed, I'd delete the duplicate outright, not move it.
+- Path-scoped loading: if some sections only matter for part of the repo (for example the parsing rules and `tests/data/`), a rule file in `.claude/rules/` with `paths:` frontmatter would load them only when Claude works on matching files. That is the one mechanism here that would reduce what loads at the start. I'd only do it if you actually want to save the tokens.
+
+The analyser also listed two AGENTS.md files above the project as dormant. They are not loaded because a CLAUDE.md exists, and they are outside this project, so ignore them.
+
+If you approve the rewording, I'll back up CLAUDE.md first, make the edit, and re-run the analyser. Then please run `/context` in a new session and check the Memory files list shows both files.

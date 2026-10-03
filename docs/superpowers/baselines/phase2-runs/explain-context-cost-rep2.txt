@@ -1,0 +1,20 @@
+Short answer: in this project the context is not actually big. The only instruction file is CLAUDE.md (260 lines, about 2,800 estimated tokens), and it loads once at session start. That cost does not recur on every request or grow with the number of turns. If your /context shows much more than that, the rest is coming from outside this project (user-level files, plugins, MCP tools), not from here.
+
+How I checked: I ran the skill's analyser with HOME pointed at an empty temporary directory, so only this project was counted. The inline HOME=... override was blocked by the sandbox, so I set HOME through a Python subprocess instead. That means your real ~/.claude files and memory are not in these numbers.
+
+What the analyser found
+- Always-on: about 2,801 tokens, all from the one CLAUDE.md. Conditional and on-demand: 0.
+- Two AGENTS.md files higher up the tree are dormant (not loaded) because a CLAUDE.md exists, so they cost nothing.
+- Docs-backed finding: the file is 260 lines, 60 over Anthropic's recommended 200.
+- Heuristic findings (this tool's judgement, so you can decline them): no "read X when modifying Y" trigger lines, and 15 "stale reference" notes. The stale references are only because this checkout contains nothing but CLAUDE.md, so none of the paths exist. Check them against your real repo before acting on any.
+- Score: 92/100. The score is this tool's own measure, not an Anthropic metric, so I would not chase it.
+
+What I'd suggest, after reading the whole file. Nothing is changed yet and I will only act on what you approve.
+
+1. Move domain detail to path-scoped rules (the main saving). Most of the file is area-specific detail that matters only when you touch that area: Bookings, Pricing, Timetables, Notifications, API, Database, Testing, Frontend, Payments, Staff admin, Manifests, Background tasks, Logging, Reports. Each could become a rule in .claude/rules/ with a paths: frontmatter (for example the API section for api/**, Frontend for static/** and templates/**, Database for migrations). Those would then load only when Claude works on matching files. I'd keep in CLAUDE.md what every session needs: the one-paragraph purpose, the Commands list, the Security basics, and Local setup. Move the lines verbatim, not summarised.
+2. Delete what Claude can derive from the code, with your approval. Candidates are the descriptive lines that restate structure, such as "The API lives in api/", "Tasks live in tasks.py inside each app", "Tests live next to the app in tests/", "Custom admin pages live in admin_extras/", and the Overview paragraph about Django/Postgres/Redis. Delete them outright rather than condensing or moving them. Keep one-line decisions the code cannot show, for example "Booking references are never reused", "Cancellations within 48 hours are non-refundable", "Prices are in pence", "Deployed migrations are never edited".
+3. Use hooks for things that must happen every time. A CLAUDE.md line is advisory only. Candidates: a PostToolUse hook running `uv run ruff check --fix` after edits, and a check that `makemigrations --check` passes. Then the matching lines can go.
+4. Move non-session content out. Support, Contacts, Release process, Observability, Glossary and similar team-process notes are for humans and do not change how Claude edits code. They could go in a block-level HTML comment, a README, or a skill if you want Claude to use them occasionally.
+5. Do not split the file into @imports. Imports load at launch together with the importing file, so that would only reorganise the same 2,800 tokens without reducing them.
+
+After any approved change I would back up the original, re-run the analyser, and ask you to run /context in a new session to confirm the Memory files list shows what you expect.

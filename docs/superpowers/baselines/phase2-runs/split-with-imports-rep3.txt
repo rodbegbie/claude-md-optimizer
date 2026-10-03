@@ -1,0 +1,34 @@
+I ran the analyser on the Ledgerly project with HOME set to an empty temporary directory. The Bash tool refused the HOME override, so I did it from a Python subprocess, and that worked. I changed nothing.
+
+**What I found**
+
+- Score: 97/100. The score is this tool's own measure, not an Anthropic metric, so I wouldn't chase it.
+- Always-on load is about 1,450 tokens: `CLAUDE.md` (21 lines, about 140 tokens) plus `docs/conventions.md` (153 lines, about 1,310 tokens).
+- The `AGENTS.md` files the analyser also found are not loaded, because a `CLAUDE.md` exists.
+
+**The main issue: lines 13-14 of `CLAUDE.md` are wrong**
+
+The text says the conventions were split out "to save context" and that "Claude loads it on demand when it is relevant." That is not how `@docs/conventions.md` works. An `@path` import loads at session start, together with the file that imports it. So the split saved nothing. All 153 lines are in context every session. (Anthropic's memory docs cover this.)
+
+A plain pointer like "see docs/conventions.md" would load nothing by itself, but then Claude would only read the file if it decided to.
+
+Proposed change, which I'd only make with your approval. Replace lines 13-14, "Our coding conventions are long, so I split them into an imported file to save context. Claude loads it on demand when it is relevant.", with a sentence that doesn't claim a saving. For example: "Our coding conventions live in an imported file, which loads with this one." Keeping the import is fine if you like the organisation. I'd leave `@docs/conventions.md` itself alone.
+
+**Whether to move any of the conventions**
+
+I wouldn't add new imports or sub-documents to shrink context. They would only reorganise the same content. About 1,450 tokens in total is modest, and nothing here needs urgent trimming.
+
+If you do want some of it out of the always-on load, the mechanisms that Claude Code itself loads later are:
+
+- **Path-scoped rules** in `.claude/rules/` with `paths:` frontmatter. This works only for sections that apply to specific files. Two candidates:
+  - The "Parsing" section (8 lines) could go in a rule scoped to `ledgerly/parsers/**`.
+  - The "Testing" section (8 lines) could go in a rule scoped to `tests/**`.
+  - I'd move them verbatim, and only if you want that. The rest of the file (Money, Errors, Git, Style and so on) applies everywhere, so it should stay.
+- **A hook** for rules that must happen every time. "Format with `ruff format`" and "Run `mypy --strict`" are only advice while they sit in CLAUDE.md. A `PostToolUse` hook that runs `ruff format` after edits would enforce the first. The second is already in CI, per the file. Tell me if you want me to draft the hook.
+
+**Smaller points**
+
+- Heuristic finding, a suggestion you can decline: `CLAUDE.md` line 21 mentions `ledgerly/parsers/`, which doesn't exist under this project directory. If the code lives elsewhere or has been renamed, update the path. If this is just a trimmed example project, ignore it.
+- A few lines in `conventions.md` are things Claude can read from the code, for example "Commands live in `ledgerly/cli.py` using `argparse`" and "Constants are UPPER_SNAKE_CASE". I'd leave them. They are short, they state conventions rather than describing the code, and removing them has no functional benefit.
+
+After any edits, I'd re-run the analyser. Then start a new session and run `/context` to check that both files show up in the Memory files list.

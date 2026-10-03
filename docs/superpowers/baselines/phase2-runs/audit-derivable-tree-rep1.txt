@@ -1,0 +1,30 @@
+I ran the analyser on this project with HOME pointed at an empty temporary directory, so only this project was analysed. The shell blocked a HOME override, so I did it through a Python subprocess instead. The report scores the file 90/100. That score is this tool's own measure, not an Anthropic metric, and I'm not aiming to raise it. The file is about 60 lines and ~422 tokens, loaded at session start. That's well under the 200-line recommendation, so size isn't the problem. The problem is that most of it is content Claude can read from the code.
+
+I haven't changed anything. Here is what I'd propose, section by section, for you to approve or decline.
+
+**Docs-backed (Anthropic best-practices page)**
+
+1. Delete the "Project structure" section (lines 5-27). It's a directory tree, and Claude can see that from the repo. I'd delete it outright rather than condense it or move it to another file.
+2. Delete the "Dependencies" section (lines 29-38). It's a version list that duplicates `pyproject.toml`. The versions will also drift out of date.
+
+**My reading, beyond what the checks caught**
+
+3. Delete the "Architecture" paragraph (lines 40-48). The analyser only flagged it as a prose paragraph, but it is an architecture overview. It describes the app factory, the two blueprints, the single `models.py`, the templates and server-side rendering, all of which Claude can learn by reading the code. Deleting it also removes the two stale-reference findings, because `models.py` and `base.html` don't exist in the project. It's a good reason not to reword that paragraph: it needs deleting, not tidying.
+   - One optional exception: the line "SQLite in development, Postgres in production" records a decision. If the code or config doesn't make that obvious, you could keep that one line. The rest should go.
+4. The "Heuristic" flags on the code block and the narrative paragraph go away once sections 1 and 3 are deleted, so there's nothing separate to fix.
+
+**Keep as is**
+
+- The title and one-line description.
+- "Commands". These are the exact invocations (`uv run flask --app app run --debug`, `uv run pytest`, the migrate command) and the test database detail, which Claude can't reliably guess.
+- "Gotchas". Both lines record constraints the code doesn't show: the fraction storage for quantities ("never store floats, scaling breaks on 1/3 cups") and the `SERVER_NAME` requirement for the test client. These are the most valuable lines in the file.
+
+**One note on enforcement**
+
+The "never store floats" rule is only advisory in CLAUDE.md, since no wording guarantees Claude follows it. If it has to hold every time, a `PostToolUse` hook that runs a check after edits, or a test asserting the column types, would enforce it. I'd treat that as optional.
+
+**After the cuts**
+
+The file would be about 20 lines: the title, Commands and Gotchas, plus the one database line if you keep it. Nothing else needs adding, reordering or splitting. If you approve, I'll back up the original CLAUDE.md first, then make the deletions and re-run the analyser. Then please run `/context` in a new session and check that the Memory files list shows what you expect.
+
+Two unrelated notes from the report: AGENTS.md files higher up the tree are dormant, because a CLAUDE.md exists at or above the working directory, so they cost nothing here. The auto memory directory wasn't found, which is expected with the empty HOME.

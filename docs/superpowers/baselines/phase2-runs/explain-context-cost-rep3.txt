@@ -1,0 +1,33 @@
+Your context is big mainly because the project's CLAUDE.md is 260 lines (about 2,800 tokens), all of it loaded at the start of every session. That is 60 lines over Anthropic's recommended 200 per file. Everything in it is "always on", so nothing is held back until it is needed. Note the cost is paid once, when the session starts. It does not grow with each turn.
+
+One caveat on the numbers: the sandbox blocked my attempt to set HOME to an empty temporary directory, so I ran the analyser without that override. The totals below therefore include your personal files under ~/.claude, not just this project.
+
+Where the always-on tokens come from (about 5,300 in total):
+
+- Project CLAUDE.md: about 2,800 tokens. This is the big one.
+- Your ~/.claude/CLAUDE.md plus six rules files (bash-conventions, context-mode, memory, python, splice, version-control): about 2,430 tokens.
+- MEMORY.md: about 67 tokens.
+- A further ~1,280 tokens of memory topic files load only on demand, and two AGENTS.md files (~2,000 tokens) are dormant because a CLAUDE.md exists, so neither adds to the always-on load.
+
+What is in the project CLAUDE.md. It has about 30 sections, and most apply to only part of the work: Payments, Frontend, Database, Testing, Staff admin, Manifests, Reports, Background tasks, Logging, API, Deployment, Security and so on. Each is only relevant when you touch that area, but all of it loads every session.
+
+What I'd suggest, as options for you to approve or decline (I have changed nothing):
+
+1. Move area-specific sections into `paths:` rules under `.claude/rules/`, so they load only when Claude works on matching files. Good candidates, moved verbatim:
+   - Frontend, to a rule for `static/**` and `templates/**`.
+   - Database, to a rule for migrations and `db/**`.
+   - Testing, to a rule for `**/tests/**`.
+   - Background tasks, to a rule for `**/tasks.py`.
+   - Payments, Manifests, Reports and Staff admin, each scoped to its own app's paths.
+   - API, to a rule for the `api/` directory.
+   This is the largest saving and it works because Claude Code loads the rules itself when they apply. Splitting into plain `@imports` would not help, since imports load at launch with the file that imports them.
+2. Occasional task knowledge could be a skill instead. Local setup and the Release process section are the best fit.
+3. The Commands section lists lint, migration checks and so on. If you want `ruff check --fix` or `makemigrations --check` to happen every time, make them hooks (PostToolUse is the usual fit). A CLAUDE.md line is advisory only. The analyser also flagged line 9 of your version-control.md rule as a hook candidate.
+4. Delete what Claude can work out from the code, with your approval. The Overview section (a description of what the app is) and any lines that just restate directory layout fall into this. Keep single-line decisions the code can't show, such as "Booking references are never reused" or "Fare changes need a new FareTable row".
+5. Stale references: the analyser found 15 paths mentioned in the file that it could not find under this project, such as `api/`, `db/queries/`, `tests/factories.py`, `docs/payments.md`, `settings/production.py`, `tasks.py`, `flags.py` and `static/js/`. Check whether they are real. If they are out of date, fix or remove them. If the project really lacks them, that is a sign of stale content that is wasting tokens.
+
+Heuristic suggestions (my tool's judgement, so optional): the analyser also notes the file has no "Read X when modifying Y" triggers, and that three prose paragraphs in your personal files (~/.claude/CLAUDE.md line 32, context-mode.md line 3, memory.md line 20) could be shorter bullets. These are minor next to the size issue.
+
+Score: 88/100. Deductions: -3 for file size, -4 for stale references (capped), -3 for the prose paragraphs, -1 for no trigger conditions, -1 for the hook candidate. The score is this tool's own measure and not an Anthropic metric, so don't chase it for its own sake.
+
+If you want to go ahead, tell me which sections to move first. I would back up the original CLAUDE.md, move the text verbatim, check that every line is still present, re-run the analyser, and then ask you to run /context in a fresh session to confirm the Memory files list looks right.

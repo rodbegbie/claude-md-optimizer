@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M412M4BAMJJ378JDB1TRN6KZ",
+  "strategy": "manual-commit",
+  "branch": "chore/docs-and-description",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "claude-md-optimizer/SKILL.md",
+    "tests/test_skill_frontmatter.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 73355,
+    "cache_read_tokens": 1093600,
+    "output_tokens": 8794,
+    "api_call_count": 15
+  }
+}

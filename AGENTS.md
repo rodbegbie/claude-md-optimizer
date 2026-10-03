@@ -107,8 +107,10 @@ always-on, and `duplicate-across` to always-on and conditional.
   "GitHub: fork only" below).
 - `git push` runs Entire's hook. The first branch push is often rejected;
   confirm the remote did not move, retry once, and never force.
-- `.claude/`, `.codex/` and `.entire/` configs are tracked and belong to the
-  Entire integration. `.agent-traces/` and `.private-journal/` are not.
+- `.codex/`, `.entire/` and the Entire entries in `.claude/settings.json` are
+  tracked and belong to the Entire integration. `.claude/hooks/` and its
+  `Bash` entry in `.claude/settings.json` are this repo's own, and Entire
+  leaves them alone. `.agent-traces/` and `.private-journal/` are not tracked.
 
 ## GitHub: fork only
 
@@ -118,9 +120,8 @@ always-on, and `duplicate-across` to always-on and conditional.
 - NEVER open a PR or an issue, or post anything else, on the upstream repo
   (`geuneda/claude-md-optimizer`). This work is fork-only and is not for
   upstream.
-- Always pass `--repo rodbegbie/claude-md-optimizer` to `gh`, because `gh`
-  defaults to upstream after forking. Check the target repo before any `gh`
-  command that writes.
+- `gh` defaults to upstream after forking, so always pass
+  `--repo rodbegbie/claude-md-optimizer`. A Claude Code hook enforces this.
 - The `upstream` remote is read-only. Never push to it. Push branches to
   `origin` and open PRs against `main` on the fork.
 

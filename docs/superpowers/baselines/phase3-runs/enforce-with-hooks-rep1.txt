@@ -1,0 +1,19 @@
+Short answer: the lines in CLAUDE.md can't make Claude do these every time. CLAUDE.md is context, and Claude usually follows it but nothing guarantees it, however firmly it is worded ("Always", "Never"). The only thing that runs every time is a hook, which Claude Code itself executes. So I'd move the five rules in your "Workflow" section into hooks in .claude/settings.json.
+
+I ran the analyser on this project (score 93/100). It flagged four of these lines as hook candidates (lines 12, 13, 14 and 16). Line 15, the "never edit tidepool/_generated/" rule, wasn't flagged, but it is also a must-hold rule and suits a hook best of all.
+
+Proposed mapping (nothing has been changed yet):
+
+1. Line 12, "Always run `ruff check` after each edit": a PostToolUse hook matching Edit|Write that runs `ruff check` on the file just changed. Lint errors go back to Claude straight away.
+2. Line 13, "Always run `ruff format` before finishing a task": a Stop hook that runs `ruff format`. (A PostToolUse hook that formats after each edit would also work and is simpler. Which do you prefer?)
+3. Line 14, "Never commit without running `pytest` first": a PreToolUse hook on Bash that spots `git commit` and runs `uv run pytest`. If the tests fail, it blocks the commit (exit code 2), so Claude sees why.
+4. Line 15, "Never edit files under `tidepool/_generated/`": a PreToolUse hook on Edit|Write that blocks any path under that directory and says "regenerate instead". This is a hard block, not a request.
+5. Line 16, "Run `mypy tidepool` before every commit": the same PreToolUse `git commit` hook as item 3, running `mypy tidepool` as well as pytest. One hook can cover both.
+
+Once the hooks are in place, I'd remove lines 12, 13, 14 and 16, since the hooks do the job and the lines would only repeat them. The one exception is the "never edit _generated" line, where I'd keep a single short line saying why (the files are generated and should be regenerated). That tells Claude the reason up front, so it doesn't just run into the block. The "Commands" and "Design notes" sections are fine and I'd leave them alone.
+
+Two things to check:
+- Please confirm the commit and Stop behaviour you want. A failing pytest or mypy will block commits, and that is the point, but it does mean slow checks run on every commit.
+- The analyser also reports that `tidepool/_generated` and `tidepool/parsers` can't be found. That's only because this folder holds just CLAUDE.md, so it's probably fine in your real repo. Do check the paths are spelled correctly, because the _generated hook depends on that path matching.
+
+If you approve, I'll draft the .claude/settings.json hooks (I'd back up any existing settings first), edit CLAUDE.md as above, re-run the analyser, and then ask you to run /context and /hooks in a fresh session to confirm the hooks are registered. I won't change any file until you say yes.

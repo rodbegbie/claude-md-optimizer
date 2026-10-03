@@ -1,0 +1,13 @@
+I ran the analyser on this project, and I read the CLAUDE.md myself. It's in good shape, so I'd leave it as it is.
+
+- Size: 22 lines, about 176 tokens, loaded at session start. That's well under Anthropic's recommended 200 lines per file.
+- Findings: none, either backed by Anthropic's docs or from this tool's own judgement. The score is 100/100. That number is only this tool's own measure, so it isn't a reason to change anything.
+- Content: every section earns its place.
+  - The Commands section gives the test commands and says the integration tests need Docker.
+  - The Gotchas section records things the code can't show on its own. These are UTC storage for timestamps, the single-threaded scheduler that is deliberate, and the shared Postgres container that needs a per-test schema.
+  - The Conventions section holds two short rules.
+  - There are no directory trees, dependency lists or architecture overviews to delete.
+- Where things could go instead: nothing here applies to only some paths, which would call for a `paths:` rule. Nothing is occasional task knowledge, which would belong in a skill.
+- One optional extra: if you want the "don't add goroutines in `internal/sched`" line to hold every time, a `PreToolUse` hook is the only thing that enforces it. The CLAUDE.md line on its own is advisory. Nothing needs changing in the file for that, and you can ignore it.
+
+I haven't changed any files. Adding sections, reformatting or splitting this file would have no functional benefit. If you like, run `/context` in a new session to confirm the Memory files list shows this file.

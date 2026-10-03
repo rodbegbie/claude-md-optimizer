@@ -1,0 +1,40 @@
+Your CLAUDE.md is about 2,800 tokens, which is small next to Claude's context window. Nothing else is adding to it. The analyser found only this one file loading for the project. The repo's own `AGENTS.md` is not loaded, because a CLAUDE.md exists. The memory directory doesn't exist in this check.
+
+**Why it's big**
+
+The file is 260 lines, 60 over Anthropic's recommended 200 per file. That is the only finding backed by Anthropic's docs. It loads in full at session start, so every section costs context whether or not the task touches it. I'd worry more about adherence than token count: long files tend to get followed less reliably.
+
+About 23 sections cover quite different areas: Bookings, Pricing, API, Database, Payments, Admin, Manifests, Logging, Reports and so on. Most sessions need only a few of them.
+
+The score is 92/100. That score is this tool's own measure, not an Anthropic metric, so I wouldn't chase it.
+
+**What I'd suggest, if you approve**
+
+All of this is advice. Nothing is changed, and I'd propose each edit against the named section and wait for your say-so.
+
+1. Content for one area of the code could move to a `.claude/rules/*.md` file with `paths:` frontmatter, so it loads only when Claude touches matching files. Candidates are:
+   - API (lines 68-79)
+   - Database (81-92)
+   - Testing (94-105)
+   - Frontend (133-144)
+   - Payments (181-190)
+   - Staff admin (192-201)
+   - Background tasks (214-223)
+   - Logging (225-234)
+   - Reports (236-245)
+   - Manifests (203-212)
+
+   These are the biggest wins. I'd move the text verbatim, with no rewording. I can't tell which paths each one should map to, because the fixture holds only the CLAUDE.md. Those paths are yours to give.
+2. Occasional task knowledge suits a skill. Release process (156-159), Local setup (247-256) and possibly Deployment (120-131) are only needed when you're doing that task.
+3. Rules that must hold every time would be better as hooks. `uv run ruff check --fix .` and `makemigrations --check` could run in a `PostToolUse` hook. Lines in CLAUDE.md are advisory only.
+4. Content Claude can derive from the code can go outright. The Overview (3-7) reads like an architecture summary, and parts of Local setup (such as "copy `.env.example`") are visible from the repo. Lines that record decisions the code can't show should stay. Examples are "Booking references are never reused" and "Prices are in pence".
+5. The `Contacts`, `Glossary` and `Support` sections are short and cheap. Keep them unless you want a leaner file.
+
+Please don't split the file into `@imports` or sub-documents to shrink it. Imports load at launch together with the file that imports them, so that only reorganises the same tokens.
+
+**Heuristic findings (my tool's judgement, so decline freely)**
+
+- **No trigger conditions:** the tool suggests "Read X when modifying Y" lines. The `paths:` rules in point 1 do this job better.
+- **Stale references:** it flagged 15 paths as not found, such as `api/`, `tests/factories.py` and `settings/production.py`. This directory holds only CLAUDE.md, so these are probably false alarms. Run the analyser against your real project root before deleting anything.
+
+After any changes, re-run the analyser. Then run `/context` in a fresh session and check that the Memory files list shows what you expect.

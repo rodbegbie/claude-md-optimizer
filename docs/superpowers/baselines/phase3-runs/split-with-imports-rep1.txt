@@ -1,0 +1,34 @@
+Rod, splitting this into more imports won't save any context. I'd use `paths:` rules for the parts that only matter in some places, and trim the rest.
+
+**Why the import doesn't help**
+
+`CLAUDE.md` line 13 says Claude "loads it on demand when it is relevant". That is wrong. An `@docs/conventions.md` import loads at session start, together with `CLAUDE.md`. The analyser reports about 1,450 tokens always-on: roughly 138 for `CLAUDE.md` and 1,312 for `conventions.md`. Splitting that file into several more imports would load the same text, just from more files. A plain "see docs/x.md" pointer wouldn't load anything itself, but Claude would only read the file if it decided the pointer applied.
+
+The load is small, and Anthropic's guidance is under 200 lines per file. `CLAUDE.md` is 21 lines and `conventions.md` is 153, so nothing here is over a limit. The savings come from content that loads only when relevant, or from content that doesn't need to load at all.
+
+**Proposals, each needing your approval**
+
+1. Correct `CLAUDE.md` lines 13-14. They currently say "I split them into an imported file to save context. Claude loads it on demand when it is relevant." Delete those two lines or reword them to say the import is only for organisation. The `@docs/conventions.md` line can stay if you like having the file separate.
+2. Move path-specific sections of `conventions.md` into `.claude/rules/*.md` files with `paths:` frontmatter. Claude Code loads these only when it works on matching files. I'd move them verbatim, with these candidates:
+   - Parsing, which would match `ledgerly/parsers/**`. This is the strongest candidate.
+   - Testing, which would match `tests/**`.
+   - CLI and Reports, which would match `ledgerly/cli.py` and the reports module. I haven't seen the real paths, so check them.
+   - Money could also be scoped, but your Notes already say "integer pence, never floats" in `CLAUDE.md`, so it's a judgement call.
+3. Look at the sections a linter, formatter or CI job already enforces:
+   - Style: `ruff format`, 88-character lines and import grouping.
+   - Typing: `mypy --strict` runs in CI.
+
+   A `PostToolUse` hook that runs `ruff format` is a better home for those rules than a prose line, because it runs every time. Prose in `CLAUDE.md` is only advisory. Claude can read the ruff and mypy config itself, so those lines are good candidates for deletion, with your approval.
+4. Leave Git, Dependencies, Documentation, Security and Errors where they are. They apply across the whole repo, so they should load in every session.
+5. Treat "Never commit real statements or account numbers" as a possible hook. If it must hold every time, a hook on commit would enforce it. The Security line alone can't.
+
+**Other findings**
+
+- The analyser also flagged `ledgerly/parsers/` as a stale reference. This sample project has no code, so ignore it here. In a real repo it would mean a rename to fix.
+- The analyser score is 97/100. It is this tool's own measure, so don't change anything just to raise it.
+
+**Before any change**
+
+I'd back up both files first, move text verbatim, and check that every line is either still present or deleted with your approval. Afterwards I'd re-run the analyser. Then run `/context` in a new session to check the Memory files list shows what you expect. I haven't changed anything.
+
+Tell me which of these you want and I'll apply them.

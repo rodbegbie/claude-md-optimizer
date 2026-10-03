@@ -1,0 +1,20 @@
+I ran the analyser on this project. Your CLAUDE.md is one file of 60 lines (about 422 tokens), loaded at session start. That is well under Anthropic's 200-line recommendation, so size is not the problem. The analyser scored it 90/100. That score is the tool's own measure, not an Anthropic metric, so I'm not chasing it. I read the whole file as well, and I'd cut three sections and keep the rest.
+
+Proposed changes, each against a named section. I haven't changed anything, and I'll only edit if you approve.
+
+1. Delete "Project structure" (lines 5-26). This is the 18-line directory tree. Claude can list the directory itself, and the tree is already drifting: `models.py` and `base.html` are not in the project directory, so the tree has gone stale. Anthropic's best-practices page lists this kind of content as something to leave out. I'd delete it outright rather than shrink it or move it to another file.
+
+2. Delete "Dependencies" (lines 28-37). Versions of flask, flask-sqlalchemy, pytest, ruff and the rest are in `pyproject.toml`, and Claude can read them there. A copy in CLAUDE.md can only go out of date. This is also a docs-backed finding.
+
+3. Delete "Architecture" (lines 39-48). It is a prose overview of the app factory, the two blueprints, the models module, templates and the database. Claude can work all of that out from `app/__init__.py` and the code around it. The analyser only flagged it as a long paragraph and two stale file references, so it missed that the whole section is derivable. Rewriting it as bullets would be the wrong fix, because a section that goes needs no rewording. One line in it might be worth keeping, if it is a decision the code can't show: SQLite in development and Postgres in production. If your config already makes that obvious, drop it too. Tell me which you prefer.
+
+Keep as they are:
+- The title and one-line description.
+- "Commands". These are the exact invocations for running the app, the tests and migrations. They are useful in every session.
+- "Gotchas". The fractions-not-floats rule and the `SERVER_NAME` test quirk are constraints the code doesn't show.
+
+On hooks: nothing here needs to hold every time, so I'm not proposing one. If "never store floats" must be enforced rather than advised, a hook could check for it after each edit. The CLAUDE.md line alone is only advisory.
+
+Afterwards I'd re-run the analyser to confirm the findings are gone. Then please run `/context` in a new session and check that the Memory files list shows what you expect.
+
+Shall I go ahead with deleting the three sections? I'll take a backup of the file first.

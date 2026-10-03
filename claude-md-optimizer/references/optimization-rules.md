@@ -134,7 +134,7 @@ Each entry gives the analyser's check id and its source tag.
   file.
 - [heuristic] `no-trigger`: a pointer to another document with no
   condition saying when to read it.
-- [heuristic] `non-english`: non-English instructions, which may use more
+- [heuristic] `non-english`: CJK text in instructions, which may use more
   tokens. Domain terms, proper nouns and exact user-facing strings stay as
   they are.
 - [heuristic] `stale-reference`: a backticked path, `npm run` script or

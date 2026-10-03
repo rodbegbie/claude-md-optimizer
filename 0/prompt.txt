@@ -1429,3 +1429,7 @@ commit and push
 ---
 
 what are the changes to .entire/settings.json?
+
+---
+
+commit and push the changes to .entire/settings.json on this branch.

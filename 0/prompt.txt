@@ -1,0 +1,5 @@
+push it and open a draft PR
+
+---
+
+Update the README that you can also install the skill using the command `npx skills install rodbegbie/claude-md-optimiser`.

@@ -1,0 +1,134 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M4133FWSV5DQG4FW7VTG7VJQ",
+  "session_id": "34021989-1a0f-4693-819b-dfaa575d6a41",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-03T14:36:18.998501Z",
+  "branch": "chore/docs-and-description",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5-5",
+  "turn_id": "132250303a90",
+  "checkpoint_transcript_start": 403,
+  "transcript_lines_at_start": 403,
+  "compact_transcript_start": 53,
+  "token_usage": {
+    "input_tokens": 10,
+    "cache_creation_tokens": 3003,
+    "cache_read_tokens": 654197,
+    "output_tokens": 2027,
+    "api_call_count": 5,
+    "subagent_tokens": {
+      "input_tokens": 70,
+      "cache_creation_tokens": 264308,
+      "cache_read_tokens": 1443978,
+      "output_tokens": 2252,
+      "api_call_count": 34
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_0153zbKaqyPF9ciqokY8Tfzd",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "superpowers:executing-plans"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "bbdc5723c753",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 84,
+        "end": 85,
+        "entry_ids": [
+          "34169a95-6ebe-4b18-9ff0-8bf6b6e2eaa9"
+        ],
+        "tool_use_id": "toolu_0153zbKaqyPF9ciqokY8Tfzd"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_0153zbKaqyPF9ciqokY8Tfzd"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: superpowers:executing-plans",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01GCUv8n1QgWZkhFieW2HfKY",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "markdown"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "bbdc5723c753",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 152,
+        "end": 153,
+        "entry_ids": [
+          "ce292d9a-cad7-4220-affa-fd3339c76f8e"
+        ],
+        "tool_use_id": "toolu_01GCUv8n1QgWZkhFieW2HfKY"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01GCUv8n1QgWZkhFieW2HfKY"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: markdown",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-03T14:36:18.972653Z",
+    "agent_lines": 7,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 7,
+    "total_lines_changed": 8,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 391,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/.active-session": 1,
+        ".agent-traces/.active-session.v2.claude.30633866613333312d396262362d3466.0c335c8f04141d595a367d83a75a5e8f4032e2d8be91e0d59d3a3453da630bcc": 1,
+        ".agent-traces/.pending-calls.v2.claude.30633866613333312d396262362d3466.0c335c8f04141d595a367d83a75a5e8f4032e2d8be91e0d59d3a3453da630bcc.json": 1,
+        ".agent-traces/.pending-calls.v2.claude.34376539626332352d613066302d3434.856d7b375822f68e9f28ae95fff559cbda2f87fd823dbd0a982d20824c5cada8.json": 1,
+        ".agent-traces/.pending-calls.v2.claude.37303131623562312d383361362d3438.9b0969ec6d2b998d8ecefce9678d92de5e08a0d7775f4ebe821c823e6cc0ee50.json": 1,
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 54,
+        ".agent-traces/0c8fa331-9bb6-4f/meta.json": 18,
+        ".agent-traces/47e9bc25-a0f0-44/events.ndjson": 230,
+        ".agent-traces/47e9bc25-a0f0-44/meta.json": 20,
+        ".agent-traces/7011b5b1-83a6-48/events.ndjson": 44,
+        ".agent-traces/7011b5b1-83a6-48/meta.json": 20
+      }
+    }
+  ]
+}

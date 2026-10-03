@@ -27,3 +27,7 @@ push the planning branch commit
 ---
 
 /claude-md-management:revise-claude-md AGENTS.md
+
+---
+
+commit and push the AGENTS.md changes on main

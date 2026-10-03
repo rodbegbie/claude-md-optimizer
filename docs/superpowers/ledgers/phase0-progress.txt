@@ -1,0 +1,98 @@
+# SDD ledger — plan: /Users/rod/build/claude-md-optimizer/docs/superpowers/plans/2026-10-02-claude-md-optimizer-rework.md
+
+Spec: /Users/rod/build/claude-md-optimizer/docs/superpowers/specs/2026-10-02-claude-md-optimizer-rework-design.md (reachable, read).
+Worktree: .claude/worktrees/chore+baseline-fixtures, branch chore/baseline-fixtures, base e913eb3 (main).
+Scope of this run: Phase 0 (Tasks 0.1-0.5). Phases 1-3 branch from main after the previous phase merges, so they wait for Rod to merge each draft PR.
+
+## Pre-flight scan: pairs sharing a file or interface
+
+| Tasks | Produces vs consumes | Finding |
+| --- | --- | --- |
+| 0.1 -> 0.2 | fixtures `tree`, `run_cli` | consistent |
+| 0.1 -> 0.3 | `tree` unused by 0.3; fixtures are static dirs | consistent |
+| 0.3 -> 0.4 | fixture names derivable-tree, oversized, import-for-savings, hook-candidates | all four exist in 0.3 |
+| 0.2 -> 1.8 | strict xfails removed in 1.8 | consistent (see R1 for flake) |
+| 1.1 -> 1.2 | `estimate_tokens`, `Limit` | consistent |
+| 1.2 -> 1.3..1.8 | `LoadedFile`, `Scope`, `LoadMode`, `totals` | consistent |
+| 1.3 -> 1.4..1.7 | `discover` extended in place | consistent; one file, serial |
+| 1.1 -> 2.4 | `FILE_LINES`, `MEMORY_*`, `COMBINED_LINES` | names match |
+| 1.8 -> 2.10 | JSON keys; 2.10 removes legacy keys | consistent, 2.10 updates shape test |
+| 2.1 -> 2.2..2.9 | `check`, `Finding`, `Source`, `Context` | consistent |
+| 2.1 -> 2.10 | `run_checks`, `score`, `render` signatures | match |
+| 0.3 -> 2.10 | `expected.json` ids vs check ids | ids match the registry list |
+| 1.9, 2.11, 3.1 | all edit SKILL.md / rules reference | serial across phases; baselines from 0.4 |
+| 0.4 -> 1.9/2.11/3.1 | baselines recorded on planning branch | reachable via planning branch path |
+
+## Pre-flight scan: each task agrees with itself
+
+| Task | Result |
+| --- | --- |
+| 0.1 | ok; Step 6 files absent from worktree (R3), python path (R2) |
+| 0.2 | test 1 flaky under strict xfail (R1) |
+| 0.3 | ok |
+| 0.4 | ok; Step 2 is a human gate (R7); runs inherit global config (R9) |
+| 0.5 | ok; push and PR need approval (R6) |
+| 1.1 | `<url>` placeholders (R8) |
+| 1.2-1.8 | ok |
+| 1.9 | ok after step reorder already fixed in plan |
+| 2.1-2.11 | ok |
+| 3.1 | ok |
+
+## Rulings
+
+- Ruling: R1 Task 0.2 `test_memory_comes_from_current_project` becomes "only another project's memory exists; assert `memory_md is None`" — the original (both dirs exist) depends on `os.walk` order, so a strict xfail would flake into XPASS failures — if wrong, the bug repro is weaker but deterministic.
+- Ruling: R2 `run_cli` invokes `sys.executable`, not `python3` — the project requires 3.13 and PATH python may differ — if wrong, a harmless extra interpreter assumption.
+- Ruling: R3 Copy the four tool-config files (`.claude/settings.json`, `.codex/hooks.json`, `.entire/settings.json`, `.entire/.gitignore`) from the main checkout into this worktree by path before Task 0.1 Step 6, after confirming they match what was scanned — they are untracked there, so a worktree off main does not have them — if wrong, a config file differs from Rod's live one.
+- Ruling: R4 The branch was renamed from `worktree-chore+baseline-fixtures` to `chore/baseline-fixtures` per the plan. A shared `.git/info/exclude` entry for `.claude/worktrees/` was not added: the worktree guard blocks writes to the shared git dir. Cost if wrong: `.claude/worktrees/` can appear untracked in the main checkout; mitigated by staging by explicit path.
+- Ruling: R5 The SDD helper scripts are blocked by the worktree guard, so the workspace and briefs are made by hand and review packages use plain `git log/diff` redirects — if wrong, slightly different file layout than the scripts produce.
+- Ruling: R6 Push and PR creation need Rod's approval (plan, Global Constraints), so each phase pauses at its PR step; later phases cannot start until Rod merges — if wrong, no cost; it is the stated plan.
+- Ruling: R7 Task 0.4 Step 2 pauses for Rod before any baseline subagent runs (Rod's explicit gate for token cost, promised earlier).
+- Ruling: R8 Where the plan writes `<memory docs URL>` or `<url>` in `limits.py`, use `https://code.claude.com/docs/en/memory` — the memory docs page is the source for all four values — if wrong, a source link points at the right site but a different anchor.
+- Ruling: R9 Baseline subagents will inherit Rod's global instructions as well as the skill under test. Every rep and every later re-run has the same inheritance, so comparisons stay valid; absolute results are not clean-room — if wrong, baselines show Rod's setup influence.
+
+## Progress
+
+Task 0.1: dispatched implementer (sonnet), BASE e913eb3efe29c7ad1e8927b484a3920bbfac5f4f; brief task-0.1-brief.md; report task-0.1-report.md
+Task 0.1: implementer DONE_WITH_CONCERNS (commits 3420b8a, 0ea5a74); ruff fails repo-wide on legacy script
+- Ruling: R10 Exclude `claude-md-optimizer/scripts/analyze_claude_md.py` from ruff in pyproject until Phase 2 Task 2.10 deletes the legacy code, instead of reformatting it now — the file is mostly replaced in Phase 2, so reformatting is churn — if wrong, the legacy script stays un-linted for two phases.
+- Pending plan edits (planning branch, needs main checkout): Task 0.1 Step 4 expects repo-wide ruff pass (now scoped by R10); Task 2.10 must remove the ruff exclude. Also Task 0.4 step 4 baselines commit on planning branch.
+Task 0.1: resumed implementer with R10 (ruff exclude commit); implementer DONE (8fa7466)
+Task 0.1: review approved (no Critical/Important); cannot-verify items resolved by controller: trailers present on all 3 commits, no hook config in repo, tree clean
+Task 0.1: minor (deferred): conftest `check=True` hides captured stderr in CalledProcessError and blocks asserting non-zero exits
+Task 0.1: minor (deferred): `run_cli` writes `home/` inside the `tree` root; a later test passing the tree root as project dir would pick it up
+Task 0.1: minor (for Rod at PR time): `.entire/settings.json` commits `"telemetry": true`; confirm that is intended
+Task 0.1: complete (commits e913eb3..8fa7466, review clean)
+- Ruling: R11 Task 0.2 xfails use `raises=AssertionError` and each test must fail for its intended reason (scoped rule at top level of rules/, not in a subdir) — a vacuous or crash-driven xfail would hide the bug it is meant to pin — if wrong, slightly stricter markers than the plan asked for.
+Task 0.2: dispatched implementer (sonnet), BASE 8fa74663eaedb3fa202dca67cd31d10b8d2a8839; brief task-0.2-brief.md; report task-0.2-report.md
+Task 0.2: implementer DONE (72b6c14); review approved (no Critical/Important); trailer verified by controller
+Task 0.2: minor (deferred): test 1 pins only the "no memory" case; positive coverage (memory_md.line_count == 3 for the current project) belongs in Task 1.7
+Task 0.2: minor (deferred): test 3 would also pass if a fix excluded ALL rules; add a second always-on rule when the xfail is removed in Task 1.8
+Task 0.2: complete (commits 8fa7466..72b6c14, review clean)
+Task 0.3: dispatched implementer (sonnet), BASE 72b6c14; brief task-0.3-brief.md; report task-0.3-report.md
+Task 0.3: implementer DONE_WITH_CONCERNS (f2ba038); concerns were observations (derivable-tree fenced tree names nonexistent paths; empty must_exclude; clean imperative) — noted for Task 2.5/2.7, not blocking
+Task 0.3: review ❌ one Important: clean fixture references nonexistent paths/make target (clean/project/CLAUDE.md:8,65-66,69), contradicts must_exclude stale-reference
+Task 0.3: fix round 1/5 (1 addressed, 0 open; commits f2ba038..7e3a3b7)
+Task 0.3: complete (commits 72b6c14..7e3a3b7, review clean after 1 fix round)
+- Ruling: R12 Baseline and re-run subagents are told to read and follow the skill from an explicit path (`<checkout>/claude-md-optimizer/SKILL.md`), never from the installed copy; Task 0.4 adds `tests/scenarios/README.md` with that run protocol (not in the plan) — `~/.claude/skills/claude-md-optimizer` is a dangling symlink to `~/.agents/skills/claude-md-optimizer`, which does not exist, so the skill is not installed at all; an installed-copy baseline would be impossible and later re-runs would not test the edited skill — if wrong, one extra small file in tests/scenarios.
+- FINDING for Rod: the user's installed claude-md-optimizer symlink is broken (target missing); not touched (user config).
+Task 0.4: Step 1 only dispatched (scenario files + README); Steps 2-4 gated on Rod (R7)
+Task 0.4 step 1: implementer DONE (afc7330, BASE 7e3a3b7); review ❌ 2 Important, both README: scoring polarity ambiguous (README.md:31-33); subagent isolation/model/clarifying-question rules missing (README.md:22-30)
+Task 0.4 step 1: fix round 1/5 (2 addressed, 0 open; commits afc7330..a14aaf6)
+Task 0.4 step 1: complete (commits 7e3a3b7..a14aaf6, review clean after 1 fix round)
+- Ruling: R13 Baseline runs tell the subagent to run the skill's script with `HOME` set to an empty temp dir, and to write its advice to a named output file; both are additions to the README's setup line — otherwise the script analyses Rod's real ~/.claude (global CLAUDE.md, rules, memory) and the advice reflects his files, not the fixture; the output file keeps 12 transcripts out of the controller context — if wrong, baselines differ slightly from a user-run session; README needs a one-line follow-up (record in baseline doc).
+Task 0.4 steps 2-4: GATE R7 PASSED by Rod (all 12 runs, Sonnet); runs dispatched in parallel (read-only), outputs in baseline-runs/
+Task 0.4 step 3: all 12 baseline runs finished (sonnet); 12 output files present; git status clean after runs (no repo edits); scorer dispatched -> baseline-scores.md
+Task 0.4 step 3: scored (baseline-scores.md): audit-derivable-tree 0/3, explain-context-cost 0/3, split-with-imports 2/3, enforce-with-hooks 3/3; 0 INVALID; controller spot-checks: explain FAILs genuine (skill's own "168,000 tokens after 30 turns" and "150 lines" repeated), audit rep2 N1 genuine, audit N3 FAIL is a rubric defect
+- Ruling: R14 Reword audit-derivable-tree N3 to allow keeping a non-derivable decision (e.g. production database) and re-score the 3 audit runs against it, rather than accept N3 as written — the literal rubric would also fail a docs-aligned answer, so it cannot measure improvement; the 12 runs themselves are not redone — if wrong, one rubric line is looser than first written.
+- Caveats for the baseline doc: (a) enforce-with-hooks rep1 HOME override blocked by sandbox, script scanned Rod's real ~/.claude; (b) all runs inherit Rod's global instructions (R9), 4 runs address him by name; enforce-with-hooks and split-with-imports already pass on the CURRENT skill so they are regression guards, not improvement detectors; (c) README setup line lacks the HOME and output-file additions (R13).
+Task 0.4 step 1 fix round 2 (controller-requested, R14): implementer DONE 7765b5b (N3 reworded; README "Setup line used" added); scoped re-review: all addressed, no breakage; trailer verified. Commits so far on branch: e913eb3..7765b5b.
+Task 0.4 step 3: re-scoring audit runs against revised N3 (scorer resumed), original verdicts kept in record
+Task 0.4: complete (commits 7e3a3b7..7765b5b; baseline doc committed on planning branch as cf0230b, docs/superpowers/baselines/2026-10-02-baseline.md). Session stopped here (usage limit).
+PHASE 0 DONE: 5th scenario added (de603d6, baseline 0/3 mild), baseline doc updated on planning branch (4559d89), pushed chore/baseline-fixtures to origin, DRAFT PR #1 opened (https://github.com/rodbegbie/claude-md-optimizer/pull/1). SIDE EFFECT: Entire pre-push hook pushed 13 checkpoint refs; 25 refs/entire/checkpoints/* now on the PUBLIC fork; contents unread; nothing deleted — WAITING ON ROD (delete remote refs / disable Entire push / accept). Phase 1 waits for Rod to merge PR #1.
+UPDATE after reset: plan amended on planning branch (01b1273). Phase 0 checks green (2 passed, 3 xfailed; ruff, markdownlint clean). Rod APPROVED push + draft PR; telemetry:true LEFT AS IS; Rod chose to ADD 5th scenario (audit-clean-file, fixture clean) BEFORE the PR. Sequence: add scenario (implementer, resumed) -> review -> 3 baseline runs (sonnet, same protocol) -> score -> append to baseline doc on planning branch -> push + DRAFT PR (body says five scenarios; flag the 4->5 change to Rod).
+(superseded) NEXT: (1) amend plan on planning branch (R1 Task 0.2 test 1 wording + raises=AssertionError; R10 ruff exclude note in Task 0.1 Step 4 and removal step in Task 2.10 ~line 745; Task 0.4 steps 3-4 now HOME/output-file/README additions, explicit skill path, Sonnet; baseline path); (2) Task 0.5: pytest/ruff, then ASK ROD before push + DRAFT PR (--repo rodbegbie/claude-md-optimizer); (3) re-enter worktree with EnterWorktree path=.claude/worktrees/chore+baseline-fixtures; (4) ask Rod re: 5th scenario on the `clean` fixture and the telemetry:true in .entire/settings.json.
+Task 0.4 steps 2-4 (was): AT GATE R7 — waiting on Rod (12 baseline runs = 4 scenarios x 3 reps). Step 4 commits the baseline doc on the planning branch in the MAIN checkout; the worktree guard blocks git there, so that needs ExitWorktree(keep) first.
+Task 0.4 step 1: minor (deferred): audit-derivable-tree.md:60 cites pyproject.toml, which the fixture lacks (reword to "derivable from the dependency manifest"); audit-derivable-tree.md:73-74 "condensed" is a slight judgement call; enforce-with-hooks.md:107-108 restates the first Must-advise line
+Task 0.3: minor (deferred): other fixtures also name nonexistent paths (emphasis-overload, hook-candidates, scoped-in-always-on, import-for-savings); when Phase 2 adds must_exclude for them, verify first. Task 2.7 must only inspect INLINE backticked tokens, not fenced blocks, or derivable-tree will fire stale-reference
+Task 0.3: minor (deferred): emphasis-overload's "do NOT disable ESLint rules inline" could trip hook-candidate; oversized has Never/never lines and unbacked paths (only size-file expected)
+

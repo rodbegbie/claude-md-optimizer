@@ -118,9 +118,6 @@ always-on, and `duplicate-across` to always-on and conditional.
 - NEVER open a PR or an issue, or post anything else, on the upstream repo
   (`geuneda/claude-md-optimizer`). This work is fork-only and is not for
   upstream.
-- Always pass `--repo rodbegbie/claude-md-optimizer` to `gh`, because `gh`
-  defaults to upstream after forking. Check the target repo before any `gh`
-  command that writes.
 - The `upstream` remote is read-only. Never push to it. Push branches to
   `origin` and open PRs against `main` on the fork.
 

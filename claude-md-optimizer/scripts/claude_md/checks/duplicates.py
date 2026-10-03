@@ -1,5 +1,6 @@
 import re
 
+from claude_md.checks._common import loaded
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile, LoadMode, Scope
 
@@ -9,7 +10,6 @@ MIN_WITHIN_CHARS = 21
 MIN_ACROSS_CHARS = 25
 LONG_FILE_LINES = 80
 
-_LOADED = frozenset({LoadMode.ALWAYS, LoadMode.CONDITIONAL})
 _PROJECT_LEVEL = frozenset({Scope.PROJECT, Scope.LOCAL, Scope.ANCESTOR, Scope.AGENTS})
 
 TRIGGER_PATTERNS = [
@@ -18,14 +18,10 @@ TRIGGER_PATTERNS = [
 ]
 
 
-def _loaded(files: list[LoadedFile]) -> list[LoadedFile]:
-    return [f for f in files if f.mode in _LOADED]
-
-
 @check("duplicate-within", HEURISTIC, weight=1, cap=3)
 def duplicate_within(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
-    for file in _loaded(files):
+    for file in loaded(files):
         counts: dict[str, int] = {}
         first_repeat: int | None = None
         for number, line in enumerate(file.text.splitlines(), start=1):
@@ -55,7 +51,7 @@ def duplicate_within(files: list[LoadedFile], ctx: Context) -> list[Finding]:
 @check("duplicate-across", HEURISTIC, weight=1, cap=3)
 def duplicate_across(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     occurrences: dict[str, list[tuple[LoadedFile, int]]] = {}
-    for file in _loaded(files):
+    for file in loaded(files):
         seen: set[str] = set()
         for number, line in enumerate(file.text.splitlines(), start=1):
             stripped = line.strip().lower()

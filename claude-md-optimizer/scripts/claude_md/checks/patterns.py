@@ -1,8 +1,9 @@
 import re
 
+from claude_md.checks._common import loaded
 from claude_md.checks._markdown import fenced_blocks, prose_lines
 from claude_md.findings import Context, Finding, Source, check
-from claude_md.model import LoadedFile, LoadMode
+from claude_md.model import LoadedFile
 
 BEST_PRACTICES = Source("docs", "https://code.claude.com/docs/en/best-practices")
 HEURISTIC = Source("heuristic", None)
@@ -31,18 +32,13 @@ VAGUE_PATTERNS = [
 MAX_CODE_BLOCK_LINES = 5
 MIN_NARRATIVE_LINES = 3
 
-_LOADED = frozenset({LoadMode.ALWAYS, LoadMode.CONDITIONAL})
 _STRUCTURAL = re.compile(r"^\s*(#|[-*+]\s|\d+[.)]\s)")
-
-
-def _loaded(files: list[LoadedFile]) -> list[LoadedFile]:
-    return [f for f in files if f.mode in _LOADED]
 
 
 @check("vague-instruction", BEST_PRACTICES, weight=3, cap=9)
 def vague_instruction(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
-    for file in _loaded(files):
+    for file in loaded(files):
         for number, line in prose_lines(file.text):
             lowered = line.lower()
             for pattern in VAGUE_PATTERNS:
@@ -67,7 +63,7 @@ def vague_instruction(files: list[LoadedFile], ctx: Context) -> list[Finding]:
 @check("linter-rule", HEURISTIC, weight=2, cap=6)
 def linter_rule(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
-    for file in _loaded(files):
+    for file in loaded(files):
         hit = next(
             (
                 (number, match.group())
@@ -107,7 +103,7 @@ def narrative_paragraph(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             "Rewrite it as short bullet points, one instruction each.",
             HEURISTIC,
         )
-        for file in _loaded(files)
+        for file in loaded(files)
         for run in _prose_runs(file.text)
         if len(run) >= MIN_NARRATIVE_LINES
     ]
@@ -138,7 +134,7 @@ def code_block_long(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             "Point to the real file as file:line instead of pasting the code.",
             HEURISTIC,
         )
-        for file in _loaded(files)
+        for file in loaded(files)
         for block in fenced_blocks(file.text)
         if block.length > MAX_CODE_BLOCK_LINES
     ]

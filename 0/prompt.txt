@@ -1,0 +1,25 @@
+push it
+
+---
+
+ok, i've approved the trail.  merge it
+
+---
+
+pull main and delete the branch
+
+---
+
+push the planning branch then end session.
+
+---
+
+Run the skill against this repo and my user-wide config.
+
+---
+
+draft the gh and no-verify hooks
+
+---
+
+Yes, install those hooks and then update the .md files to remove the instructions that they replace.

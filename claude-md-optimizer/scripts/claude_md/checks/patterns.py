@@ -99,7 +99,7 @@ def narrative_paragraph(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             "suggestion",
             file.path,
             run[0],
-            f"{file.path}:{run[0]} has a {len(run)}-line prose paragraph.",
+            f"{file.path}:{run[0]} contains a prose paragraph of {len(run)} lines.",
             "Rewrite it as short bullet points, one instruction each.",
             HEURISTIC,
         )
@@ -129,7 +129,7 @@ def code_block_long(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             "suggestion",
             file.path,
             block.start,
-            f"{file.path}:{block.start} has a {block.length}-line code block "
+            f"{file.path}:{block.start} contains a code block of {block.length} lines "
             f"(over {MAX_CODE_BLOCK_LINES}).",
             "Point to the real file as file:line instead of pasting the code.",
             HEURISTIC,

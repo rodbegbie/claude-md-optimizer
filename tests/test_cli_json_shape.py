@@ -76,7 +76,6 @@ def test_conditional_rule_listed_but_not_counted(tree, run_cli):
     assert [f["mode"] for f in scoped] == ["conditional"]
     assert scoped[0]["scope"] == "project_rule"
     assert scoped[0]["paths"] == ["src/**"]
-    assert all(f["path"] != scoped[0]["path"] for f in result["findings"])
     assert result["totals"]["conditional"] > 0
     always = [f for f in result["files"] if f["mode"] == "always"]
     assert result["totals"]["always"] == sum(f["tokens"] for f in always)

@@ -64,9 +64,15 @@ def test_score_floor_zero():
 def test_score_is_independent_of_finding_order():
     register("t-a", 2, 4)
     register("t-b", 1, 3)
-    found = [make_finding("t-a", 1), make_finding("t-b", 2), make_finding("t-a", 3)]
-    assert score(found) == score(list(reversed(found)))
-    assert score(found) == score(found)
+    forward = [make_finding("t-a", 1), make_finding("t-b", 2)]
+    backward = [make_finding("t-b", 2), make_finding("t-a", 1)]
+    assert score(forward) == score(backward)
+    assert [d.check_id for d in score(backward).deductions] == ["t-a", "t-b"]
+
+
+def test_score_rejects_unregistered_check_id():
+    with pytest.raises(ValueError, match="t-missing"):
+        score([make_finding("t-missing")])
 
 
 def test_heuristic_cap_lower_than_docs_cap():

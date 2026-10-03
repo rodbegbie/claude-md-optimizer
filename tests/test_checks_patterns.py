@@ -84,7 +84,7 @@ def test_narrative_flags_three_line_paragraph():
     found = narrative_paragraph([make(text)], CTX)
     assert len(found) == 1
     assert found[0].line == 3
-    assert "3-line" in found[0].message
+    assert "3 lines" in found[0].message
 
 
 def test_narrative_ignores_short_prose_and_lists():

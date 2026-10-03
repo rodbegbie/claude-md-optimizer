@@ -91,28 +91,24 @@ def test_additional_project_level_files_are_loaded_in_order(tree, run_cli):
 
 
 def test_every_always_on_file_is_listed_and_checked(tree, run_cli):
+    vague = "Follow best practices.\n"
     root = tree(
         {
-            "project/CLAUDE.md": "@docs/x.md\n- Use uv.\n",
-            "project/docs/x.md": "- imported\n",
-            "project/.claude/CLAUDE.md": "- second\n",
-            "project/.claude/rules/r.md": "- rule\n",
-            "project/CLAUDE.local.md": "- local\n",
-            "home/.claude/CLAUDE.md": "- user\n",
+            "project/CLAUDE.md": "@docs/x.md\n" + vague,
+            "project/docs/x.md": vague,
+            "project/.claude/CLAUDE.md": vague,
+            "project/.claude/rules/r.md": vague,
+            "project/CLAUDE.local.md": vague,
+            "home/.claude/CLAUDE.md": vague,
         }
     )
     result = run_cli(root / "project")
     always = {f["path"] for f in result["files"] if f["mode"] == "always"}
     assert len(always) >= 6
-    expected = (
-        "docs/x.md",
-        "project/.claude/CLAUDE.md",
-        ".claude/rules/r.md",
-        "CLAUDE.local.md",
-        "home/.claude/CLAUDE.md",
-    )
-    for suffix in expected:
-        assert any(p.endswith(suffix) for p in always), suffix
+    checked = {
+        f["path"] for f in result["findings"] if f["check_id"] == "vague-instruction"
+    }
+    assert checked == always
 
 
 def test_text_mode_lists_the_additional_files(tree):

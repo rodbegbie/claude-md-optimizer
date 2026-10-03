@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 from claude_md.checks._common import loaded
 from claude_md.checks._markdown import prose_lines
@@ -10,63 +11,27 @@ HEURISTIC = Source("heuristic", None)
 MAX_OBJECT_WORDS = 3
 QUOTE_CHARS = 60
 
-_RULE = re.compile(
-    r"\b(always use|never use|don['’]t use|do not use|prefer|avoid|never|use)\s+(.*)",
-    re.IGNORECASE,
+_NEGATIVE = re.compile(
+    r"\b(?:never use|don['’]t use|do not use|avoid|never)\s+(.*)", re.IGNORECASE
 )
-_POSITIVE = frozenset({"always use", "prefer", "use"})
+_POSITIVE = [
+    re.compile(r"\b(?:always|should|must|please)\s+use\s+(.*)", re.IGNORECASE),
+    re.compile(r"\bprefer\s+(.*)", re.IGNORECASE),
+    re.compile(r"^use\s+(.*)", re.IGNORECASE),
+]
+_LIST_MARKER = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+_DOUBLE_NEGATION = re.compile(
+    r"\b(?:do not|don['’]t|never)\s+(?:avoid|never)\b", re.IGNORECASE
+)
 _CLAUSE_END = re.compile(r"[.,;:!?()\[\]—–]|\s-\s")
 _WORD = re.compile(r"[\w+#/.-]+")
+QUALIFIERS = frozenset(
+    "for in on when unless except only with within during if where".split()  # noqa: SIM905
+)
 STOPWORDS = frozenset(
-    {
-        "a",
-        "an",
-        "the",
-        "any",
-        "all",
-        "your",
-        "our",
-        "my",
-        "this",
-        "that",
-        "these",
-        "those",
-        "it",
-        "its",
-        "to",
-        "of",
-        "for",
-        "in",
-        "on",
-        "with",
-        "when",
-        "if",
-        "unless",
-        "instead",
-        "and",
-        "or",
-        "but",
-        "is",
-        "are",
-        "be",
-        "as",
-        "at",
-        "by",
-        "from",
-        "only",
-        "over",
-        "than",
-        "then",
-        "so",
-        "not",
-        "no",
-        "more",
-        "most",
-        "less",
-        "very",
-        "just",
-        "also",
-    }
+    """a an the any all your our my this that these those it its to of for in on
+    with when if unless instead and or but is are be as at by from only over than
+    then so not no more most less very just also using""".split()  # noqa: SIM905
 )
 
 FIX = (
@@ -75,23 +40,47 @@ FIX = (
 )
 
 
-def _instruction(line: str) -> tuple[bool, frozenset[str]] | None:
-    match = _RULE.search(line.replace("`", ""))
-    if not match:
+@dataclass(frozen=True)
+class _Instruction:
+    file: LoadedFile
+    number: int
+    line: str
+    positive: bool
+    key: frozenset[str]
+
+
+def _parse(line: str) -> tuple[bool, frozenset[str]] | None:
+    """Return (positive, object words), or None when the line is not a plain rule."""
+    text = _LIST_MARKER.sub("", line).replace("`", "").replace("*", "").strip()
+    if _DOUBLE_NEGATION.search(text):
         return None
-    positive = match.group(1).lower() in _POSITIVE
-    rest = _CLAUSE_END.split(match.group(2), maxsplit=1)[0]
+    candidates: list[tuple[int, bool, str]] = []
+    if match := _NEGATIVE.search(text):
+        candidates.append((match.start(), False, match.group(1)))
+    for pattern in _POSITIVE:
+        if match := pattern.search(text):
+            candidates.append((match.start(), True, match.group(1)))
+    if not candidates:
+        return None
+    _, positive, rest = min(candidates, key=lambda c: c[0])
+    clause = _CLAUSE_END.split(rest, maxsplit=1)[0]
+    tokens = [t.strip(".-/") for t in _WORD.findall(clause.lower())]
     words: list[str] = []
-    for raw in _WORD.findall(rest.lower()):
-        word = raw.strip(".-/")
-        if not word or word in STOPWORDS:
+    remaining: list[str] = []
+    for index, token in enumerate(tokens):
+        if not token or token in STOPWORDS:
             if words:
+                remaining = tokens[index:]
                 break
             continue
-        words.append(word.removesuffix("s") if len(word) > 3 else word)
+        words.append(token.removesuffix("s") if len(token) > 3 else token)
         if len(words) == MAX_OBJECT_WORDS:
+            remaining = tokens[index + 1 :]
             break
-    return (positive, frozenset(words)) if words else None
+    tail = _WORD.findall(rest[len(clause) :].lower())
+    if not words or QUALIFIERS.intersection(remaining + tail):
+        return None
+    return positive, frozenset(words)
 
 
 def _quote(line: str) -> str:
@@ -101,31 +90,41 @@ def _quote(line: str) -> str:
 
 @check("possible-conflict", HEURISTIC, weight=1, cap=2)
 def possible_conflict(files: list[LoadedFile], ctx: Context) -> list[Finding]:
-    entries: list[tuple[LoadedFile, int, str, bool, frozenset[str]]] = []
+    buckets: dict[frozenset[str], dict[bool, list[_Instruction]]] = {}
+    found: list[Finding] = []
     for file in sorted(loaded(files), key=lambda f: f.order):
         for number, line in prose_lines(file.text):
-            parsed = _instruction(line)
-            if parsed:
-                entries.append((file, number, line, *parsed))
-
-    found: list[Finding] = []
-    for i, (later, l_num, l_line, l_pos, l_obj) in enumerate(entries):
-        for earlier, e_num, e_line, e_pos, e_obj in entries[:i]:
-            if earlier.scope == later.scope or l_pos == e_pos or l_obj != e_obj:
+            parsed = _parse(line)
+            if not parsed:
                 continue
-            found.append(
-                Finding(
-                    "possible-conflict",
-                    "suggestion",
-                    later.path,
-                    l_num,
-                    f"{later.path}:{l_num} ('{_quote(l_line)}') may conflict "
-                    f"with {earlier.path}:{e_num} ('{_quote(e_line)}'). This "
-                    "is a low-confidence heuristic that matches the same "
-                    "object with opposite polarity, so check whether the two "
-                    "really clash.",
-                    FIX,
-                    HEURISTIC,
-                )
+            positive, key = parsed
+            later = _Instruction(file, number, line, positive, key)
+            bucket = buckets.setdefault(key, {True: [], False: []})
+            earlier = next(
+                (
+                    e
+                    for e in bucket[not positive]
+                    if e.file.scope != file.scope and e.file.path != file.path
+                ),
+                None,
             )
+            bucket[positive].append(later)
+            if earlier:
+                found.append(_finding(earlier, later))
     return found
+
+
+def _finding(earlier: _Instruction, later: _Instruction) -> Finding:
+    return Finding(
+        "possible-conflict",
+        "suggestion",
+        later.file.path,
+        later.number,
+        f"{later.file.path}:{later.number} ('{_quote(later.line)}') may "
+        f"conflict with {earlier.file.path}:{earlier.number} "
+        f"('{_quote(earlier.line)}'). This is a low-confidence heuristic that "
+        "matches the same object with opposite polarity, so check whether the "
+        "two really clash.",
+        FIX,
+        HEURISTIC,
+    )

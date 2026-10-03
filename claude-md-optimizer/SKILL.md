@@ -1,6 +1,6 @@
 ---
 name: claude-md-optimizer
-description: Analyze and optimize CLAUDE.md files for Claude Code. This skill should be used when the user wants to improve their CLAUDE.md configuration, reduce context token waste, fix anti-patterns, or restructure their Claude Code instructions for maximum effectiveness. Triggers on requests like "optimize my CLAUDE.md", "review my claude config", "improve claude instructions", "clean up CLAUDE.md", or "make my CLAUDE.md more effective". Scores files 0-100 and detects non-English overhead and cross-file duplicates.
+description: Use when the user wants to audit, trim or restructure CLAUDE.md files, .claude/rules or MEMORY.md, when Claude seems to ignore their instructions, or when Claude Code warns that a memory file is large. Triggers on "optimize my CLAUDE.md", "review my claude config", "clean up my instructions".
 ---
 
 # CLAUDE.md Optimizer

@@ -1,4 +1,5 @@
 from claude_md.checks import (
+    conflicts,  # noqa: F401
     derivable,  # noqa: F401
     duplicates,  # noqa: F401
     enforcement,  # noqa: F401

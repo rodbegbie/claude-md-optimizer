@@ -98,7 +98,7 @@ def test_ignores_table_and_command_list():
 
 
 def test_only_loaded_files():
-    assert derivable_content([make(TREE, LoadMode.ON_DEMAND)], CTX) == []
+    assert derivable_content([make(TREE, LoadMode.EXCLUDED)], CTX) == []
 
 
 def run_fixture(name: str, tmp_path: Path) -> set[str]:
@@ -124,7 +124,29 @@ def test_fixtures_excluding_id_do_not_flag(tmp_path):
             assert "derivable-content" not in ids, expected.parent.name
 
 
-def test_repo_agents_md_not_flagged():
-    path = Path(__file__).parent.parent / "AGENTS.md"
-    text = path.read_text()
-    assert derivable_content([make(text)], CTX) == []
+AGENTS_SAMPLE = """# AGENTS.md
+
+## What this repo is
+
+A Claude Code skill (`claude-md-optimizer/`) that audits `CLAUDE.md` files,
+plus a Python analyser it runs.
+
+## Commands
+
+Python 3.13+, managed with `uv`. There are no runtime dependencies.
+
+```bash
+uv sync                                  # install pytest and ruff
+uv run pytest                            # full suite
+uv run pytest tests/test_limits.py       # one file
+uv run ruff check . && uv run ruff format --check .
+python3 claude-md-optimizer/scripts/analyze_claude_md.py <project-dir> [--json]
+```
+
+`pytest` puts `claude-md-optimizer/scripts` on `pythonpath`, so tests import
+`claude_md.*` directly.
+"""
+
+
+def test_representative_agents_md_not_flagged():
+    assert derivable_content([make(AGENTS_SAMPLE)], CTX) == []

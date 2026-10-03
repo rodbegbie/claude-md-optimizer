@@ -1,6 +1,7 @@
 import re
 
-from claude_md.checks._common import loaded
+from claude_md.checks._common import is_loaded, loaded
+from claude_md.checks._markdown import prose_lines
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile, LoadMode, Scope
 
@@ -18,15 +19,19 @@ TRIGGER_PATTERNS = [
 ]
 
 
+def _has_text(line: str) -> bool:
+    return any(ch.isalnum() for ch in line)
+
+
 @check("duplicate-within", HEURISTIC, weight=1, cap=3)
 def duplicate_within(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
     for file in loaded(files):
         counts: dict[str, int] = {}
         first_repeat: int | None = None
-        for number, line in enumerate(file.text.splitlines(), start=1):
+        for number, line in prose_lines(file.text):
             stripped = line.strip().lower()
-            if len(stripped) < MIN_WITHIN_CHARS:
+            if len(stripped) < MIN_WITHIN_CHARS or not _has_text(stripped):
                 continue
             counts[stripped] = counts.get(stripped, 0) + 1
             if counts[stripped] == 2 and first_repeat is None:
@@ -39,8 +44,9 @@ def duplicate_within(files: list[LoadedFile], ctx: Context) -> list[Finding]:
                     "warning",
                     file.path,
                     first_repeat,
-                    f"{file.path}:{first_repeat} is one of {repeated} duplicate "
-                    "lines within this file.",
+                    f"{file.path}:{first_repeat} is the first repeat of {repeated} "
+                    f"duplicated {'line' if repeated == 1 else 'lines'} within "
+                    "this file.",
                     "Remove the repeated lines to save context tokens.",
                     HEURISTIC,
                 )
@@ -51,11 +57,17 @@ def duplicate_within(files: list[LoadedFile], ctx: Context) -> list[Finding]:
 @check("duplicate-across", HEURISTIC, weight=1, cap=3)
 def duplicate_across(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     occurrences: dict[str, list[tuple[LoadedFile, int]]] = {}
-    for file in loaded(files):
+    for file in files:
+        if not is_loaded(file):
+            continue
         seen: set[str] = set()
-        for number, line in enumerate(file.text.splitlines(), start=1):
+        for number, line in prose_lines(file.text):
             stripped = line.strip().lower()
-            if len(stripped) < MIN_ACROSS_CHARS or stripped.startswith("#"):
+            if (
+                len(stripped) < MIN_ACROSS_CHARS
+                or stripped.startswith("#")
+                or not _has_text(stripped)
+            ):
                 continue
             normalized = " ".join(stripped.split())
             if normalized not in seen:

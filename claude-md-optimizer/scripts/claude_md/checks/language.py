@@ -1,6 +1,6 @@
 import unicodedata
 
-from claude_md.checks._common import LOADED_MODES
+from claude_md.checks._common import is_checked
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile
 from claude_md.text import is_cjk_char
@@ -15,7 +15,7 @@ EXTRA_TOKENS_PER_CJK_CHAR = 1.25
 def non_english(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
     for file in files:
-        if file.mode not in LOADED_MODES:
+        if not is_checked(file):
             continue
         letters = cjk = 0
         for ch in file.text:

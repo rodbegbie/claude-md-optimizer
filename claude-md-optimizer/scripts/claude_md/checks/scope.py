@@ -21,6 +21,8 @@ _CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
 _IMPORT_WORD = r"(?P<imp>\bimport\w*)"
 _SAVING = r"\b(?:save|saving|reduce|reducing|cut|cutting|lower|lowering)\s+(?:\w+\s+){0,2}(?:context|tokens?)\b"
 _NEAR = r"[^.!?]{0,80}?"
+_NEGATOR = re.compile(r"\b(?:not|no|never|without|cannot)\b|n't\b", re.IGNORECASE)
+_NEGATED_TAIL = re.compile(r"(?:\b(?:not|no|never|cannot)|n't)\s+$", re.IGNORECASE)
 _MISCONCEPTION = (
     re.compile(_IMPORT_WORD + _NEAR + _SAVING, re.IGNORECASE),
     re.compile(_SAVING + _NEAR + _IMPORT_WORD, re.IGNORECASE),
@@ -54,7 +56,7 @@ def scope_candidate(files: list[LoadedFile], ctx: Context) -> list[Finding]:
                     number,
                     f"{file.path}:{number} section '{title}' has {count} rules "
                     "that apply only when working on particular paths, yet it "
-                    "loads for every task. Path-scoped rules and nested "
+                    "loads at launch. Path-scoped rules and nested "
                     "CLAUDE.md files load only when they are relevant.",
                     SCOPE_FIX,
                     MEMORY,
@@ -116,7 +118,12 @@ def import_misconception(files: list[LoadedFile], ctx: Context) -> list[Finding]
 def _first_claim_line(text: str) -> int | None:
     for paragraph in _paragraphs(text):
         joined = " ".join(line for _, line in paragraph)
-        hits = [m.start("imp") for rx in _MISCONCEPTION if (m := rx.search(joined))]
+        hits = [
+            m.start("imp")
+            for rx in _MISCONCEPTION
+            for m in rx.finditer(joined)
+            if not _negated(joined, m)
+        ]
         if not hits:
             continue
         offset = min(hits)
@@ -126,6 +133,11 @@ def _first_claim_line(text: str) -> int | None:
             if offset < position:
                 return number
     return None
+
+
+def _negated(text: str, match: re.Match[str]) -> bool:
+    before = text[max(0, match.start() - 20) : match.start()]
+    return bool(_NEGATOR.search(match.group()) or _NEGATED_TAIL.search(before))
 
 
 def _paragraphs(text: str) -> Iterator[list[tuple[int, str]]]:

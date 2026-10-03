@@ -40,9 +40,9 @@ def test_size_file_ok_at_200_lines():
     assert size_file([make(200)], CTX) == []
 
 
-def test_size_file_covers_conditional_and_skips_on_demand():
+def test_size_file_covers_conditional_and_skips_excluded():
     assert len(size_file([make(250, LoadMode.CONDITIONAL)], CTX)) == 1
-    assert size_file([make(250, LoadMode.ON_DEMAND)], CTX) == []
+    assert size_file([make(250, LoadMode.EXCLUDED)], CTX) == []
 
 
 def write_memory(tmp_path: Path, content: str) -> list[LoadedFile]:

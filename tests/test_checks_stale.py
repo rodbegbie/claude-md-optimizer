@@ -185,7 +185,7 @@ def test_fenced_code_skipped(tmp_path):
 
 def test_only_loaded_project_files(tmp_path):
     text = "`src/missing.py`\n"
-    assert run(tmp_path, text, mode=LoadMode.ON_DEMAND) == []
+    assert run(tmp_path, text, mode=LoadMode.EXCLUDED) == []
     assert run(tmp_path, text, scope=Scope.USER) == []
     assert run(tmp_path, text, scope=Scope.ANCESTOR) == []
     assert lines(run(tmp_path, text, mode=LoadMode.CONDITIONAL)) == [1]

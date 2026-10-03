@@ -14,4 +14,7 @@ def test_fixture_expected_ids(case, tmp_path, run_cli):
     assert set(expected["must_include"]) <= ids
     assert not set(expected["must_exclude"]) & ids
     if case == "clean":
+        result = run_cli(project)
+        assert result["findings"] == []
+        assert result["score"]["value"] == 100
         assert not CHECK_IDS & ids

@@ -59,6 +59,7 @@ def vague_instruction(files: list[LoadedFile], ctx: Context) -> list[Finding]:
                             BEST_PRACTICES,
                         )
                     )
+                    break
     return found
 
 

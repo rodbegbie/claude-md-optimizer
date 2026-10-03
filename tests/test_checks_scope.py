@@ -127,7 +127,7 @@ def test_import_ignores_fenced_sentence():
 
 def test_import_only_loaded_files():
     text = import_text("We split into imports to save tokens.")
-    assert import_misconception([make(text, LoadMode.ON_DEMAND)], CTX) == []
+    assert import_misconception([make(text, LoadMode.EXCLUDED)], CTX) == []
 
 
 def run_fixture(name: str, tmp_path: Path) -> set[str]:

@@ -72,7 +72,7 @@ def test_hook_candidate_ignores_fenced_code():
 
 def test_hook_candidate_only_loaded_files():
     text = "Always run `ruff format`.\n"
-    assert hook_candidate([make(text, LoadMode.ON_DEMAND)], CTX) == []
+    assert hook_candidate([make(text, LoadMode.EXCLUDED)], CTX) == []
 
 
 def test_emphasis_flags_six_lines():
@@ -118,7 +118,7 @@ def test_emphasis_ignores_fenced_code():
 
 
 def test_emphasis_only_loaded_files():
-    assert emphasis_dilution([make(emphatic(8), LoadMode.ON_DEMAND)], CTX) == []
+    assert emphasis_dilution([make(emphatic(8), LoadMode.EXCLUDED)], CTX) == []
 
 
 def run_fixture(name: str, tmp_path: Path) -> set[str]:

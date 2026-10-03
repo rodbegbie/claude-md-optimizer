@@ -67,9 +67,9 @@ def test_vague_ignores_specific_instruction():
     assert vague_instruction([make(text)], CTX) == []
 
 
-def test_vague_skips_on_demand_files():
+def test_vague_skips_excluded_files():
     text = "Follow best practices\n"
-    assert vague_instruction([make(text, LoadMode.ON_DEMAND)], CTX) == []
+    assert vague_instruction([make(text, LoadMode.EXCLUDED)], CTX) == []
 
 
 def test_linter_flags_formatting_rule_once_per_file():

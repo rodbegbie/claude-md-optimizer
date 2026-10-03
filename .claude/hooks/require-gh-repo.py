@@ -91,6 +91,11 @@ UNPARSEABLE_GH = re.compile(
     r"\bgh\s+(pr|issue|release|label|repo|api|workflow|run|secret|variable"
     r"|cache|ruleset)\b"
 )
+PR_OR_ISSUE_URL = re.compile(
+    r"https?://github\.com/([^/\s]+)/([^/\s#?]+)/(?:pull|issues)/\d+\S*",
+    re.IGNORECASE,
+)
+REPO_LIKE = re.compile(r"[\w.-]+/[\w.-]+")
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 SHELL_C_FLAG = re.compile(r"-[a-z]*c[a-z]*")
 
@@ -117,13 +122,14 @@ def normalise(command: str) -> str:
     return "".join(out)
 
 
-def strip_heredocs(command: str) -> str:
-    """Drop heredoc bodies, which are data, but keep the rest of their line."""
+def strip_heredocs(command: str) -> tuple[str, list[str]]:
+    """Drop heredoc bodies but keep the substitutions an unquoted one runs."""
+    executed: list[str] = []
     start = 0
     while match := HEREDOC.search(command, start):
         line_end = command.find("\n", match.end())
         if line_end == -1:
-            return command
+            break
         terminator = re.compile(
             rf"^[ \t]*{re.escape(match.group(2))}[ \t]*$", re.MULTILINE
         )
@@ -131,9 +137,12 @@ def strip_heredocs(command: str) -> str:
         if end is None:
             start = match.end()
             continue
+        if not match.group(1):
+            body = command[line_end + 1 : end.start()].replace('"', " ")
+            executed.extend(substitutions(f'"{body}"'))
         command = command[:line_end] + command[end.end() :]
         start = line_end
-    return command
+    return command, executed
 
 
 def substitutions(command: str) -> list[str]:
@@ -186,16 +195,28 @@ def normalise_repo(value: str) -> str:
     return value.removesuffix(".git")
 
 
+def has_foreign_url(args: list[str]) -> bool:
+    """A PR or issue URL argument wins over --repo, so it must be the fork's."""
+    fork = normalise_repo(FORK)
+    for arg in args:
+        match = PR_OR_ISSUE_URL.fullmatch(arg)
+        if match and normalise_repo(f"{match[1]}/{match[2]}") != fork:
+            return True
+    return False
+
+
 def names_fork(args: list[str]) -> bool:
     fork = normalise_repo(FORK)
     for i, arg in enumerate(args):
         if arg in ("--repo", "-R") and i + 1 < len(args):
-            return normalise_repo(args[i + 1]) == fork
+            return normalise_repo(args[i + 1]) == fork and not has_foreign_url(args)
         if arg.startswith("--repo="):
-            return normalise_repo(arg.split("=", 1)[1]) == fork
+            value = normalise_repo(arg.split("=", 1)[1])
+            return value == fork and not has_foreign_url(args)
     if args[:1] == ["repo"]:
-        positionals = [a for a in args[2:] if not a.startswith("-")]
-        return bool(positionals) and normalise_repo(positionals[0]) == fork
+        named = [normalise_repo(a) for a in args[2:]]
+        repos = [n for n in named if REPO_LIKE.fullmatch(n)]
+        return bool(repos) and all(r == fork for r in repos)
     return False
 
 
@@ -262,7 +283,7 @@ def unwrap(tokens: list[str]) -> tuple[list[str], bool]:
 
 
 def problems_in(command: str, depth: int = 0, fallback: bool = True) -> list[str]:
-    command = strip_heredocs(command)
+    command, executed = strip_heredocs(command)
     try:
         parsed = segments(command)
     except ValueError:
@@ -273,7 +294,7 @@ def problems_in(command: str, depth: int = 0, fallback: bool = True) -> list[str
     for segment in parsed:
         found.extend(segment_problems(segment, depth))
     if depth <= 3:
-        for body in substitutions(command):
+        for body in [*substitutions(command), *executed]:
             found.extend(problems_in(body, depth + 1, fallback=False))
     return list(dict.fromkeys(found))
 

@@ -72,6 +72,11 @@ def run_hook(command: str) -> subprocess.CompletedProcess[str]:
         "cat <(gh pr create --title t)",
         f"gh repo sync {UPSTREAM} --source {FORK}",
         "cat <<'EOF' | gh pr create --title t\nbody\nEOF",
+        f"gh repo sync --source {FORK} {UPSTREAM}",
+        f"gh pr comment https://github.com/{UPSTREAM}/pull/1 --repo {FORK} --body hi",
+        f"gh issue close https://github.com/{UPSTREAM}/issues/2 -R {FORK}",
+        "cat <<EOF\n$(gh pr create --title x)\nEOF",
+        "cat <<EOF\n`gh pr create --title x`\nEOF",
     ],
 )
 def test_blocks_writes_not_aimed_at_the_fork(command):
@@ -114,6 +119,12 @@ def test_blocks_writes_not_aimed_at_the_fork(command):
         "timeout 30 gh pr view 7",
         "cat > notes.md <<'EOF'\nIt's easy: gh pr create\nEOF",
         f"gh pr create --repo {FORK} --body \"$(cat <<'EOF'\nIt's: gh pr view\nEOF\n)\"",
+        f"gh pr comment https://github.com/{FORK}/pull/1 --repo {FORK} --body hi",
+        f"gh pr view https://github.com/{UPSTREAM}/pull/1",
+        f"gh pr create --repo {FORK} --body 'see https://github.com/{UPSTREAM}/pull/1'",
+        f"gh repo sync {FORK} --source {FORK}",
+        "cat <<'EOF'\n$(gh pr create --title x)\nEOF",
+        "cat <<EOF\nplain text: gh pr create\nEOF",
     ],
 )
 def test_allows_reads_and_fork_writes(command):

@@ -1,7 +1,10 @@
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
 from claude_md.text import _FENCE
+
+_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 
 
 @dataclass(frozen=True)
@@ -49,3 +52,14 @@ def fenced_blocks(text: str) -> list[FencedBlock]:
     if fence is not None:
         blocks.append(FencedBlock(start, len(lines) - start))
     return blocks
+
+
+def headings(lines: list[str]) -> list[tuple[int, int, str]]:
+    found: list[tuple[int, int, str]] = []
+    fenced = False
+    for number, line in enumerate(lines, start=1):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+        elif not fenced and (match := _HEADING.match(line)):
+            found.append((number, len(match.group(1)), match.group(2)))
+    return found

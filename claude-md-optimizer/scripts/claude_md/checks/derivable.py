@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 
 from claude_md.checks._common import loaded
-from claude_md.checks._markdown import fenced_blocks
+from claude_md.checks._markdown import fenced_blocks, headings
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile
 
@@ -19,7 +19,6 @@ _DEPENDENCY = re.compile(
     \s*(?:==|>=|<=|~=|\^|@|:|\s)\s*["'`]?v?\d+(?:\.\d+)+[\w.+\-]*["'`]?,?\s*$""",
     re.VERBOSE,
 )
-_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 _DERIVABLE_HEADING = re.compile(r"architecture|project\s+structure", re.IGNORECASE)
 _LIST_ITEM = re.compile(r"^\s*([-*+]|\d+[.)])\s")
 
@@ -99,13 +98,13 @@ def _section_hits(lines: list[str], covered: list[int]) -> list[_Hit]:
     Sections that already contain another hit are skipped, so each block is
     reported once.
     """
-    headings = _headings(lines)
+    marks = headings(lines)
     hits: list[_Hit] = []
-    for index, (number, level, title) in enumerate(headings):
+    for index, (number, level, title) in enumerate(marks):
         if not _DERIVABLE_HEADING.search(title):
             continue
         end = next(
-            (n for n, lvl, _ in headings[index + 1 :] if lvl <= level),
+            (n for n, lvl, _ in marks[index + 1 :] if lvl <= level),
             len(lines) + 1,
         )
         body = [line for line in lines[number : end - 1] if line.strip()]
@@ -115,14 +114,3 @@ def _section_hits(lines: list[str], covered: list[int]) -> list[_Hit]:
         if len(body) > MAX_SECTION_LINES and items * 2 >= len(body):
             hits.append(_Hit(number, f"a long '{title}' section"))
     return hits
-
-
-def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
-    found: list[tuple[int, int, str]] = []
-    fenced = False
-    for number, line in enumerate(lines, start=1):
-        if line.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
-        elif not fenced and (match := _HEADING.match(line)):
-            found.append((number, len(match.group(1)), match.group(2)))
-    return found

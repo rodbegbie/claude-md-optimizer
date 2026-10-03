@@ -32,12 +32,9 @@ python3 claude-md-optimizer/scripts/analyze_claude_md.py <project-dir> [--json]
 
 ## Architecture
 
-`scripts/analyze_claude_md.py` is the CLI entry point and is mid-migration.
-It still holds the legacy per-file checks (`analyze_file`, regex pattern
-lists, `calculate_score`) and is excluded from ruff in `pyproject.toml`
-(remove the exclusion when the rework retires it). Its helpers have been
-moved into the `claude_md` package, so edit the package, not the copies the
-script still carries.
+`scripts/analyze_claude_md.py` is a thin CLI wrapper: `discover()`, then
+`run_checks()`, `score()` and `render()` (or JSON). All logic lives in the
+`claude_md` package.
 
 The `claude_md` package models what Claude Code actually loads:
 
@@ -55,9 +52,33 @@ The `claude_md` package models what Claude Code actually loads:
   it is verified.
 - `text.py`: token estimate, HTML-comment stripping, frontmatter and `paths:`
   parsing.
+- `findings.py`: the check registry. `@check(id, source, weight, cap)`
+  registers a function that returns `Finding`s. `source` is `docs` (with a
+  page URL) or `heuristic` (no URL).
+- `checks/`: one module per group of checks. Importing `claude_md.checks`
+  registers them, so a new module needs a line in `checks/__init__.py`.
+  Shared helpers are in `_markdown.py` and `_common.py`; use
+  `text.fence_step` for fenced-code state, never a new copy.
+- `scoring.py`, `report.py`: the score starts at 100 and only goes down
+  (`min(cap, weight * count)` per check id). `render()` groups findings by
+  source tag.
 
-The main script analyses only the `ALWAYS`-loaded files for scoring, but
-reports all of them.
+Each check chooses its files. `checks/_common.py` `loaded()` gives always-on,
+conditional and non-memory on-demand files; size and trigger checks narrow to
+always-on, and `duplicate-across` to always-on and conditional.
+
+## Writing checks
+
+- Report lines from `file.source_text` (removed frontmatter and comment lines
+  stay as blanks, so numbers match the file on disk). Use `file.text` for
+  sizes, tokens and whole-text matching.
+- Messages must not claim per-request or compounding cost; tests grep for
+  "per request", "turns", "compound" and "session cost".
+- Adding or removing a check: update the id pin in `tests/test_final_fixes.py`
+  and the fixtures' `expected.json`. The `clean` fixture must stay at zero
+  findings.
+- `test_scoring.py` asserts heuristic caps total less than docs caps. Run it
+  before changing any weight or cap.
 
 ## Tests
 
@@ -67,7 +88,9 @@ reports all of them.
   `root / "project"`, never `tmp_path` itself, or the fake home is analysed as
   project content.
 - `tests/fixtures/<name>/{project/,expected.json}` are sample projects;
-  `test_fixtures_wellformed.py` validates their shape.
+  `test_fixtures_wellformed.py` validates their shape. Run them from a copy
+  in `tmp_path`: in place, the repo's own `AGENTS.md` is an ancestor and
+  leaks into the findings.
 - `tests/scenarios/` are manual, agent-run checks of the skill's advice, not
   pytest. Follow the run and isolation protocol in `tests/scenarios/README.md`
   exactly (fresh subagent, explicit skill path, `HOME` override, 3 reps).
@@ -76,7 +99,8 @@ reports all of them.
 ## Repo conventions
 
 - Markdown must be markdownlint-clean (lines under 80 characters, blank lines
-  around blocks).
+  around blocks). The Entire-managed block at the end of this file is longer
+  than that and reports MD013; leave it alone.
 - Phase plans, specs and baselines live only on branch
   `planning/claude-md-optimizer-rework`. Never merge them to `main`.
 - Work is phased, and each phase ends in a draft PR to `main` on the fork (see

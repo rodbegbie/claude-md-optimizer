@@ -5,4 +5,5 @@ from claude_md.checks import (
     language,  # noqa: F401
     patterns,  # noqa: F401
     size,  # noqa: F401
+    stale,  # noqa: F401
 )

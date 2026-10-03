@@ -1413,3 +1413,7 @@ File a GH issue for the CLI arguments work.  I'll probably want to address it wi
 ---
 
 Add an enhancement label to that issue.  Also, you should update the project AGENTS.md to make clear that no PRs or Issues should be opened on the upstream repo. All interactions with github MUST happen on my fork.
+
+---
+
+commit and force push the fixes.

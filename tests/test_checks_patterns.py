@@ -43,6 +43,22 @@ def test_fenced_blocks_unterminated_runs_to_end():
     assert fenced_blocks("x\n```\n1\n2\n") == [FencedBlock(2, 2)]
 
 
+FOUR = "a\n````md\n```py\n# inside\nx\n```\n````\nb\n"
+
+
+def test_longer_fence_with_an_inner_fence_is_one_block_for_prose_lines():
+    assert list(prose_lines(FOUR)) == [(1, "a"), (8, "b")]
+
+
+def test_longer_fence_with_an_inner_fence_is_one_block_for_fenced_blocks():
+    assert fenced_blocks(FOUR) == [FencedBlock(2, 4)]
+
+
+def test_longer_fence_with_an_inner_fence_hides_headings():
+    assert headings(FOUR.splitlines()) == []
+    assert headings([*FOUR.splitlines(), "# after"]) == [(9, 1, "after")]
+
+
 def test_headings_find_a_heading_after_a_mismatched_fence_closes():
     lines = ["~~~", "```", "~~~", "# real"]
     assert headings(lines) == [(4, 1, "real")]

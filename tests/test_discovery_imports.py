@@ -395,3 +395,10 @@ def test_import_helpers_are_public_for_the_checks_that_reuse_them():
     assert import_tokens(text) == ["docs/a.md"]
     assert looks_like_path("docs/a.md")
     assert not looks_like_path("someone")
+
+
+def test_import_tokens_skip_a_longer_fence_with_an_inner_fence():
+    from claude_md.discovery import import_tokens
+
+    text = "````md\n```\n@a.md\n```\n@b.md\n````\n@c.md\n"
+    assert import_tokens(text) == ["c.md"]

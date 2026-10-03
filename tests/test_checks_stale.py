@@ -176,6 +176,29 @@ def test_make_in_prose_is_not_a_target(tmp_path, span):
     assert run(tmp_path, f"Always `{span}` first.\n") == []
 
 
+def test_make_target_that_is_an_existing_file_or_directory_is_not_stale(tmp_path):
+    write(tmp_path, "Makefile", "all:\n\ttrue\n")
+    write(tmp_path, "README.md")
+    write(tmp_path, "docs/index.md")
+    write(tmp_path, "build/out.txt")
+    text = "`make README.md` `make docs` `make build/out.txt`\n"
+    assert run(tmp_path, text) == []
+
+
+def test_make_target_missing_from_makefile_and_disk_is_still_flagged(tmp_path):
+    write(tmp_path, "Makefile", "all:\n\ttrue\n")
+    write(tmp_path, "README.md")
+    found = run(tmp_path, "`make README.md` `make CHANGELOG.md` `make docs/gone.md`\n")
+    assert len(found) == 2
+    assert "CHANGELOG.md" in found[0].message
+    assert "docs/gone.md" in found[1].message
+
+
+def test_make_target_with_parent_segments_cannot_be_verified(tmp_path):
+    write(tmp_path, "Makefile", "all:\n\ttrue\n")
+    assert run(tmp_path, "`make ../elsewhere/out.txt` `make a/../b`\n") == []
+
+
 def test_a_defined_target_that_looks_like_prose_is_still_checked(tmp_path):
     write(tmp_path, "Makefile", "sure:\n\ttrue\nbuild:\n\ttrue\n")
     assert run(tmp_path, "`make sure` `make build`\n") == []

@@ -81,31 +81,29 @@ def duplicate_across(files: list[LoadedFile], ctx: Context) -> list[Finding]:
 
     found: list[Finding] = []
     for text, hits in occurrences.items():
-        group = _redundant_group(hits)
-        if group is None:
-            continue
-        paths = list(dict.fromkeys(file.path for file, _ in group))
-        first_file, first_line = group[0]
-        listing = ", ".join(str(p) for p in paths)
-        always_on = any(file.mode == LoadMode.ALWAYS for file, _ in group)
-        found.append(
-            Finding(
-                "duplicate-across",
-                "warning",
-                first_file.path,
-                first_line,
-                f"{first_file.path}:{first_line} repeats a line found in "
-                f"{len(paths)} loaded files ({listing}): '{text[:80]}'.",
-                ALWAYS_ON_FIX if always_on else SAME_PATHS_FIX,
-                HEURISTIC,
+        for group in _redundant_groups(hits):
+            paths = list(dict.fromkeys(file.path for file, _ in group))
+            first_file, first_line = group[0]
+            listing = ", ".join(str(p) for p in paths)
+            always_on = any(file.mode == LoadMode.ALWAYS for file, _ in group)
+            found.append(
+                Finding(
+                    "duplicate-across",
+                    "warning",
+                    first_file.path,
+                    first_line,
+                    f"{first_file.path}:{first_line} repeats a line found in "
+                    f"{len(paths)} loaded files ({listing}): '{text[:80]}'.",
+                    ALWAYS_ON_FIX if always_on else SAME_PATHS_FIX,
+                    HEURISTIC,
+                )
             )
-        )
     return found
 
 
-def _redundant_group(
+def _redundant_groups(
     hits: list[tuple[LoadedFile, int]],
-) -> list[tuple[LoadedFile, int]] | None:
+) -> list[list[tuple[LoadedFile, int]]]:
     if any(file.mode == LoadMode.ALWAYS for file, _ in hits):
         candidates = [hits]
     else:
@@ -113,10 +111,7 @@ def _redundant_group(
         for file, number in hits:
             by_scope.setdefault(frozenset(file.paths or ()), []).append((file, number))
         candidates = list(by_scope.values())
-    for group in candidates:
-        if len({file.path for file, _ in group}) >= 2:
-            return group
-    return None
+    return [g for g in candidates if len({file.path for file, _ in g}) >= 2]
 
 
 @check("no-trigger", HEURISTIC, weight=1, cap=1)

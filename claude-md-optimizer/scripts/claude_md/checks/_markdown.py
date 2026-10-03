@@ -2,7 +2,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from claude_md.text import _FENCE
+from claude_md.text import fence_step
 
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 
@@ -20,14 +20,8 @@ def prose_lines(text: str) -> Iterator[tuple[int, str]]:
     """
     fence: str | None = None
     for number, line in enumerate(text.splitlines(), start=1):
-        match = _FENCE.match(line)
-        if match:
-            if fence is None:
-                fence = match.group(1)
-            elif fence == match.group(1):
-                fence = None
-            continue
-        if fence is None:
+        fence, is_fence = fence_step(line, fence)
+        if not is_fence and fence is None:
             yield number, line
 
 
@@ -41,14 +35,14 @@ def fenced_blocks(text: str) -> list[FencedBlock]:
     fence: str | None = None
     start = 0
     for number, line in enumerate(lines, start=1):
-        match = _FENCE.match(line)
-        if not match:
+        was_open = fence is not None
+        fence, is_fence = fence_step(line, fence)
+        if not is_fence:
             continue
-        if fence is None:
-            fence, start = match.group(1), number
-        elif fence == match.group(1):
+        if was_open:
             blocks.append(FencedBlock(start, number - start - 1))
-            fence = None
+        else:
+            start = number
     if fence is not None:
         blocks.append(FencedBlock(start, len(lines) - start))
     return blocks
@@ -120,12 +114,7 @@ def headings(lines: list[str]) -> list[tuple[int, int, str]]:
     found: list[tuple[int, int, str]] = []
     fence: str | None = None
     for number, line in enumerate(lines, start=1):
-        fence_match = _FENCE.match(line)
-        if fence_match:
-            if fence is None:
-                fence = fence_match.group(1)
-            elif fence == fence_match.group(1):
-                fence = None
-        elif fence is None and (match := _HEADING.match(line)):
+        fence, is_fence = fence_step(line, fence)
+        if not is_fence and fence is None and (match := _HEADING.match(line)):
             found.append((number, len(match.group(1)), match.group(2)))
     return found

@@ -10,7 +10,7 @@ CJK_RANGES = [
     (0x3130, 0x318F),
 ]
 
-_FENCE = re.compile(r"^\s*(```|~~~)")
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 _PATHS_KEY = re.compile(r"^paths:[ \t]*(.*)$")
 _LIST_ITEM = re.compile(r"^\s*-\s+(.*)$")
 
@@ -44,6 +44,27 @@ def estimate_tokens(text: str) -> int:
     return int(tokens)
 
 
+def fence_step(line: str, fence: str | None) -> tuple[str | None, bool]:
+    """Advance a fenced-code scan by one line.
+
+    `fence` is the opening delimiter run while inside a block, else None.
+    Returns the new state and whether this line opened or closed a block.
+    A block closes only on a bare run of the same character at least as long
+    as the opener.
+    """
+    match = _FENCE.match(line)
+    if not match:
+        return fence, False
+    run, rest = match.groups()
+    if fence is None:
+        if run[0] == "`" and "`" in rest:
+            return None, False
+        return run, True
+    if run[0] == fence[0] and len(run) >= len(fence) and not rest.strip():
+        return None, True
+    return fence, False
+
+
 def _strip_html_comments(text: str) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
     fence: str | None = None
@@ -58,13 +79,8 @@ def _strip_html_comments(text: str) -> list[tuple[int, str]]:
             if rest.strip():
                 out.append((number, rest))
             continue
-        match = _FENCE.match(line)
-        if match:
-            if fence is None:
-                fence = match.group(1)
-            elif fence == match.group(1):
-                fence = None
-        if fence is None and not match and line.lstrip().startswith("<!--"):
+        fence, is_fence = fence_step(line, fence)
+        if fence is None and not is_fence and line.lstrip().startswith("<!--"):
             start = line.index("<!--")
             end = line.find("-->", start + 4)
             if end == -1:

@@ -91,6 +91,18 @@ def test_duplicate_across_with_three_scopes_flags_only_the_redundant_pair():
     assert "other.md" not in found[0].message
 
 
+def test_duplicate_across_reports_every_redundant_scope_group():
+    src_a = conditional("/p/.claude/rules/src-a.md", ["src/**"])
+    src_b = conditional("/p/.claude/rules/src-b.md", ["src/**"])
+    tests_a = conditional("/p/.claude/rules/tests-a.md", ["tests/**"])
+    tests_b = conditional("/p/.claude/rules/tests-b.md", ["tests/**"])
+    found = duplicate_across([src_a, src_b, tests_a, tests_b], CTX)
+    assert len(found) == 2
+    assert [f.path for f in found] == [src_a.path, tests_a.path]
+    assert "tests-" not in found[0].message
+    assert "src-" not in found[1].message
+
+
 def test_duplicate_across_negative_for_distinct_files_and_headings():
     a = make("# A heading that is long enough to count\n")
     b = make("# A heading that is long enough to count\n", path="/p/b.md")

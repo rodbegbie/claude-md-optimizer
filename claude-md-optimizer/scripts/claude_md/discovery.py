@@ -11,7 +11,12 @@ from claude_md.limits import (
     MEMORY_LINES,
 )
 from claude_md.model import LoadedFile, LoadMode, Scope
-from claude_md.text import effective_text_with_lines, parse_paths, split_frontmatter
+from claude_md.text import (
+    effective_text_with_lines,
+    fence_step,
+    parse_paths,
+    split_frontmatter,
+)
 
 PRUNED_DIRS = frozenset({"node_modules", "__pycache__", "venv", ".venv"})
 PROJECT_LEVEL_SCOPES = frozenset(
@@ -30,7 +35,6 @@ DORMANT_AGENTS_NOTE = (
 )
 TRAILING_PUNCTUATION = ".,;:!?)]}'\""
 DEPTH_NOTE = "import depth limit reached"
-_FENCE = re.compile(r"^\s*(```|~~~)")
 _CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
 _IMPORT = re.compile(r"(?<!\S)@(\S+)")
 _EXTENSION = re.compile(r"\.\w+$")
@@ -232,14 +236,8 @@ def import_tokens(text: str) -> list[str]:
     tokens: list[str] = []
     fence: str | None = None
     for line in text.splitlines():
-        match = _FENCE.match(line)
-        if match:
-            if fence is None:
-                fence = match.group(1)
-            elif fence == match.group(1):
-                fence = None
-            continue
-        if fence is None:
+        fence, is_fence = fence_step(line, fence)
+        if not is_fence and fence is None:
             tokens.extend(_IMPORT.findall(_CODE_SPAN.sub(" ", line)))
     return tokens
 

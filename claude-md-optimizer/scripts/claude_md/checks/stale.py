@@ -159,6 +159,7 @@ PNPM_YARN_BUILTINS = frozenset(
     ]
 )
 NPM_RUN_FLAGS = frozenset(["--if-present", "--silent", "-s", "--ignore-scripts"])
+# Deliberately never flagged, even if the package has neither dependency nor script.
 JS_BINARIES = frozenset(
     [
         "tsc",
@@ -394,11 +395,17 @@ def _make_problems(words: list[str], directories: list[str], run: _Run) -> list[
     path, defined = makefile
     if any(t in PROSE_AFTER_MAKE and t not in defined for t in targets):
         return []
+    base = os.path.normpath(str(path.parent))
     return [
         f"runs `make {target}`, but no target named {target} is defined in {path}."
         for target in targets
-        if target not in defined
+        if target not in defined and not _file_target_exists(base, target)
     ]
+
+
+def _file_target_exists(base: str, target: str) -> bool:
+    parts = [part for part in target.split("/") if part]
+    return ".." in parts or _exists(base, parts)
 
 
 def _path_problems(

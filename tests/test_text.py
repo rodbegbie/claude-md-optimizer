@@ -128,6 +128,40 @@ def test_effective_text_keeps_frontmatter_for_non_rules():
     assert text.effective_text(src, is_rule=False) == "---\nx: 1\n---\nbody\n"
 
 
+def test_fence_step_opens_and_closes_with_the_same_delimiter():
+    assert text.fence_step("```py", None) == ("```", True)
+    assert text.fence_step("code", "```") == ("```", False)
+    assert text.fence_step("```", "```") == (None, True)
+    assert text.fence_step("  ~~~", None) == ("~~~", True)
+
+
+def test_fence_step_a_longer_opening_needs_an_equally_long_closing_run():
+    assert text.fence_step("````md", None) == ("````", True)
+    assert text.fence_step("```py", "````") == ("````", False)
+    assert text.fence_step("```", "````") == ("````", False)
+    assert text.fence_step("`````", "````") == (None, True)
+
+
+def test_fence_step_a_closing_fence_cannot_carry_an_info_string():
+    assert text.fence_step("```text", "```") == ("```", False)
+    assert text.fence_step("```   ", "```") == (None, True)
+
+
+def test_fence_step_does_not_mix_delimiter_characters():
+    assert text.fence_step("~~~", "```") == ("```", False)
+    assert text.fence_step("```", "~~~") == ("~~~", False)
+
+
+def test_fence_step_inline_triple_backticks_are_not_a_fence():
+    assert text.fence_step("```code``` in a sentence", None) == (None, False)
+    assert text.fence_step("plain line", None) == (None, False)
+
+
+def test_strip_html_comments_keeps_a_comment_inside_a_longer_fence():
+    src = "````md\n```\n<!-- keep -->\n```\n<!-- keep too -->\n````\n<!-- gone -->\n"
+    assert text.strip_html_comments(src) == src.replace("<!-- gone -->\n", "")
+
+
 def test_effective_lines_map_back_to_source_after_frontmatter_and_comment():
     src = "---\npaths: a\n---\n<!-- c\nmore\n-->\nbody\nlast\n"
     stripped, numbers = text.effective_text_with_lines(src, is_rule=True)

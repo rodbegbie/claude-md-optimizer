@@ -95,5 +95,23 @@ def test_run_checks_skips_excluded_and_dormant_files(tmp_path):
 
     results = run_checks(files, ctx)
 
-    assert seen == [Path("always.md"), Path("conditional.md")]
+    assert seen == [
+        Path("always.md"),
+        Path("conditional.md"),
+        Path("on_demand.md"),
+    ]
     assert [f.path for f in results] == seen
+
+
+def test_run_checks_passes_on_demand_files(tmp_path):
+    seen: list[LoadMode] = []
+
+    @check("t-on-demand", HEURISTIC, weight=1, cap=1)
+    def recorder(files, ctx):
+        seen.extend(f.mode for f in files)
+        return []
+
+    ctx = Context(project_dir=tmp_path, home_dir=tmp_path)
+    run_checks([make_file("nested.md", LoadMode.ON_DEMAND)], ctx)
+
+    assert seen == [LoadMode.ON_DEMAND]

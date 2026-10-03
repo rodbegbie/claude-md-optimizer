@@ -49,7 +49,7 @@ class CheckSpec:
 
 REGISTRY: dict[str, CheckSpec] = {}
 
-CHECKED_MODES = frozenset({LoadMode.ALWAYS, LoadMode.CONDITIONAL})
+_UNCHECKED_MODES = frozenset({LoadMode.EXCLUDED, LoadMode.DORMANT, LoadMode.SKIPPED})
 
 
 def check(
@@ -65,7 +65,7 @@ def check(
 
 
 def run_checks(files: list[LoadedFile], ctx: Context) -> list[Finding]:
-    checked = [f for f in files if f.mode in CHECKED_MODES]
+    checked = [f for f in files if f.mode not in _UNCHECKED_MODES]
     results: list[Finding] = []
     for spec in REGISTRY.values():
         results.extend(spec.fn(checked, ctx))

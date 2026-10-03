@@ -121,6 +121,66 @@ def test_binaries_from_dependencies_not_flagged(tmp_path):
     assert run(tmp_path, "`pnpm vitest`\n") == []
 
 
+@pytest.mark.parametrize(
+    "command", ["pnpm tsc", "yarn tsc --noEmit", "pnpm eslint .", "yarn prettier -c ."]
+)
+def test_common_binaries_from_differently_named_packages_not_flagged(tmp_path, command):
+    pkg = {"scripts": {"build": "x"}, "devDependencies": {"typescript": "5"}}
+    write(tmp_path, "package.json", json.dumps(pkg))
+    assert run(tmp_path, f"Run `{command}` before pushing.\n") == []
+
+
+def test_binary_present_in_node_modules_bin_not_flagged(tmp_path):
+    write(tmp_path, "package.json", json.dumps({"scripts": {}}))
+    write(tmp_path, "node_modules/.bin/ts-prune")
+    assert run(tmp_path, "`pnpm ts-prune`\n") == []
+
+
+def test_unknown_non_run_command_still_flagged(tmp_path):
+    write(tmp_path, "package.json", json.dumps({"scripts": {"build": "x"}}))
+    assert len(run(tmp_path, "`pnpm gen`\n")) == 1
+
+
+def test_command_after_cd_is_not_checked_against_the_root_package(tmp_path):
+    write(tmp_path, "package.json", json.dumps({"scripts": {"build": "x"}}))
+    write(tmp_path, "frontend/package.json", json.dumps({"scripts": {"check": "x"}}))
+    text = (
+        "`cd frontend && npm run check`\n"
+        "`(cd frontend && npm run check)`\n"
+        "`cd frontend; yarn check`\n"
+        "`cd frontend && make lint`\n"
+    )
+    write(tmp_path, "Makefile", "build:\n\ttrue\n")
+    assert run(tmp_path, text) == []
+
+
+def test_command_before_cd_is_still_checked(tmp_path):
+    write(tmp_path, "package.json", json.dumps({"scripts": {"build": "x"}}))
+    found = run(tmp_path, "`npm run nope && cd frontend`\n")
+    assert len(found) == 1
+    assert "nope" in found[0].message
+
+
+@pytest.mark.parametrize(
+    "span",
+    [
+        "make sure",
+        "make sure the build passes",
+        "make sense of it",
+        "make it work",
+        "make changes",
+    ],
+)
+def test_make_in_prose_is_not_a_target(tmp_path, span):
+    write(tmp_path, "Makefile", "build:\n\ttrue\n")
+    assert run(tmp_path, f"Always `{span}` first.\n") == []
+
+
+def test_a_defined_target_that_looks_like_prose_is_still_checked(tmp_path):
+    write(tmp_path, "Makefile", "sure:\n\ttrue\nbuild:\n\ttrue\n")
+    assert run(tmp_path, "`make sure` `make build`\n") == []
+
+
 def test_workspaces_skip_script_checks(tmp_path):
     pkg = {"scripts": {}, "workspaces": ["packages/*"]}
     write(tmp_path, "package.json", json.dumps(pkg))

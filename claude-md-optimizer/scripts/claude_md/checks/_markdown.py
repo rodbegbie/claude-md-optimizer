@@ -118,10 +118,14 @@ def paragraph_lines(text: str) -> Iterator[tuple[int, str]]:
 
 def headings(lines: list[str]) -> list[tuple[int, int, str]]:
     found: list[tuple[int, int, str]] = []
-    fenced = False
+    fence: str | None = None
     for number, line in enumerate(lines, start=1):
-        if line.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
-        elif not fenced and (match := _HEADING.match(line)):
+        fence_match = _FENCE.match(line)
+        if fence_match:
+            if fence is None:
+                fence = fence_match.group(1)
+            elif fence == fence_match.group(1):
+                fence = None
+        elif fence is None and (match := _HEADING.match(line)):
             found.append((number, len(match.group(1)), match.group(2)))
     return found

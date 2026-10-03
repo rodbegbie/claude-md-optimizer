@@ -41,7 +41,7 @@ MIN_NARRATIVE_LINES = 3
 def vague_instruction(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     found: list[Finding] = []
     for file in loaded(files):
-        for number, line in prose_lines(file.text):
+        for number, line in prose_lines(file.source_text):
             lowered = line.lower()
             for pattern in VAGUE_PATTERNS:
                 match = re.search(pattern, lowered)
@@ -70,7 +70,7 @@ def linter_rule(files: list[LoadedFile], ctx: Context) -> list[Finding]:
         hit = next(
             (
                 (number, match.group())
-                for number, line in prose_lines(file.text)
+                for number, line in prose_lines(file.source_text)
                 for pattern in LINTER_PATTERNS
                 if (match := re.search(pattern, line.lower()))
             ),
@@ -107,7 +107,7 @@ def narrative_paragraph(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             HEURISTIC,
         )
         for file in loaded(files)
-        for run in _prose_runs(file.text)
+        for run in _prose_runs(file.source_text)
         if len(run) >= MIN_NARRATIVE_LINES
     ]
 
@@ -136,6 +136,6 @@ def code_block_long(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             HEURISTIC,
         )
         for file in loaded(files)
-        for block in fenced_blocks(file.text)
+        for block in fenced_blocks(file.source_text)
         if block.length > MAX_CODE_BLOCK_LINES
     ]

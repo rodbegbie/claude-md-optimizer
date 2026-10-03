@@ -52,6 +52,45 @@ def test_duplicate_across_flags_shared_line_once():
     assert "/p/.claude/rules/r.md" in found[0].message
 
 
+def conditional(path: str, paths: list[str], text: str = LINE + "\n") -> LoadedFile:
+    file = make(text, LoadMode.CONDITIONAL, path, Scope.PROJECT_RULE)
+    file.paths = paths
+    return file
+
+
+def test_duplicate_across_ignores_rules_scoped_to_different_paths():
+    src = conditional("/p/.claude/rules/src.md", ["src/**"])
+    tests = conditional("/p/.claude/rules/tests.md", ["tests/**"])
+    assert duplicate_across([src, tests], CTX) == []
+
+
+def test_duplicate_across_flags_rules_scoped_to_the_same_paths():
+    a = conditional("/p/.claude/rules/a.md", ["src/**", "lib/**"])
+    b = conditional("/p/.claude/rules/b.md", ["lib/**", "src/**"])
+    found = duplicate_across([a, b], CTX)
+    assert len(found) == 1
+    assert "same paths" in found[0].fix
+
+
+def test_duplicate_across_flags_a_scoped_copy_of_an_always_on_line():
+    always = make(LINE + "\n")
+    scoped = conditional("/p/.claude/rules/src.md", ["src/**"])
+    found = duplicate_across([always, scoped], CTX)
+    assert len(found) == 1
+    assert found[0].path == always.path
+    assert "always-loaded" in found[0].fix
+
+
+def test_duplicate_across_with_three_scopes_flags_only_the_redundant_pair():
+    one = conditional("/p/.claude/rules/one.md", ["src/**"])
+    two = conditional("/p/.claude/rules/two.md", ["src/**"])
+    other = conditional("/p/.claude/rules/other.md", ["tests/**"])
+    found = duplicate_across([one, two, other], CTX)
+    assert len(found) == 1
+    assert "one.md" in found[0].message and "two.md" in found[0].message
+    assert "other.md" not in found[0].message
+
+
 def test_duplicate_across_negative_for_distinct_files_and_headings():
     a = make("# A heading that is long enough to count\n")
     b = make("# A heading that is long enough to count\n", path="/p/b.md")

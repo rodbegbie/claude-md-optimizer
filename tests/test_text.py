@@ -128,6 +128,33 @@ def test_effective_text_keeps_frontmatter_for_non_rules():
     assert text.effective_text(src, is_rule=False) == "---\nx: 1\n---\nbody\n"
 
 
+def test_effective_lines_map_back_to_source_after_frontmatter_and_comment():
+    src = "---\npaths: a\n---\n<!-- c\nmore\n-->\nbody\nlast\n"
+    stripped, numbers = text.effective_text_with_lines(src, is_rule=True)
+    assert stripped == "body\nlast\n"
+    assert numbers == [7, 8]
+
+
+def test_effective_lines_keep_the_remainder_after_a_closing_comment():
+    src = "a\n<!-- x\n-->tail\nb\n"
+    stripped, numbers = text.effective_text_with_lines(src, is_rule=False)
+    assert stripped == "a\ntail\nb\n"
+    assert numbers == [1, 3, 4]
+
+
+def test_effective_lines_are_the_identity_without_anything_to_strip():
+    src = "a\nb\nc\n"
+    assert text.effective_text_with_lines(src, is_rule=True) == (src, [1, 2, 3])
+
+
+def test_effective_text_matches_effective_text_with_lines():
+    src = "---\npaths: a\n---\n<!-- c -->\nbody\n"
+    assert (
+        text.effective_text(src, is_rule=True)
+        == (text.effective_text_with_lines(src, is_rule=True)[0])
+    )
+
+
 def test_estimate_tokens_keeps_the_values_the_legacy_estimator_produced():
     samples = {
         "The quick brown fox jumps over the lazy dog. " * 5: 56,

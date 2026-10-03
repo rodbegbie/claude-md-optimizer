@@ -4,6 +4,7 @@ from claude_md import checks  # noqa: F401
 from claude_md.checks._markdown import (
     FencedBlock,
     fenced_blocks,
+    headings,
     paragraph_lines,
     prose_lines,
 )
@@ -40,6 +41,22 @@ def test_fenced_blocks_report_start_and_length():
 
 def test_fenced_blocks_unterminated_runs_to_end():
     assert fenced_blocks("x\n```\n1\n2\n") == [FencedBlock(2, 2)]
+
+
+def test_headings_find_a_heading_after_a_mismatched_fence_closes():
+    lines = ["~~~", "```", "~~~", "# real"]
+    assert headings(lines) == [(4, 1, "real")]
+
+
+def test_headings_ignore_headings_inside_either_kind_of_fence():
+    lines = ["# one", "```", "# not", "```", "~~~", "## also not", "~~~", "## two"]
+    assert headings(lines) == [(1, 1, "one"), (8, 2, "two")]
+
+
+def test_headings_treat_a_longer_mismatch_like_prose_lines():
+    text = "```\nx\n~~~\n# inside\n```\n# after\n"
+    assert [n for n, _ in prose_lines(text)] == [6]
+    assert headings(text.splitlines()) == [(6, 1, "after")]
 
 
 def test_registered_with_expected_sources():

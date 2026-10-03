@@ -11,7 +11,7 @@ from claude_md.limits import (
     MEMORY_LINES,
 )
 from claude_md.model import LoadedFile, LoadMode, Scope
-from claude_md.text import effective_text, parse_paths, split_frontmatter
+from claude_md.text import effective_text_with_lines, parse_paths, split_frontmatter
 
 PRUNED_DIRS = frozenset({"node_modules", "__pycache__", "venv", ".venv"})
 PROJECT_LEVEL_SCOPES = frozenset(
@@ -150,11 +150,11 @@ class _Loader:
     ) -> None:
         importer.notes[:] = [n for n in importer.notes if not n.startswith(DEPTH_NOTE)]
         child_hop = hop + 1
-        for raw_token in _import_tokens(importer.text):
+        for raw_token in import_tokens(importer.text):
             token = raw_token.rstrip(TRAILING_PUNCTUATION)
             target = self._resolve(importer.path, raw_token)
             if target is None:
-                if _looks_like_path(token):
+                if looks_like_path(token):
                     _note(importer, f"import target missing: @{token}")
                 continue
             key = target.resolve()
@@ -209,15 +209,17 @@ def _read(
     if is_rule:
         paths = parse_paths(split_frontmatter(raw)[0])
         mode = LoadMode.ALWAYS if paths is None else LoadMode.CONDITIONAL
+    text, line_numbers = effective_text_with_lines(raw, is_rule=is_rule)
     return LoadedFile(
         path=path,
         scope=scope,
         mode=mode,
         order=order,
         raw=raw,
-        text=effective_text(raw, is_rule=is_rule),
+        text=text,
         paths=paths,
         notes=notes,
+        line_numbers=line_numbers,
     )
 
 
@@ -226,7 +228,7 @@ def _note(file: LoadedFile, note: str) -> None:
         file.notes.append(note)
 
 
-def _import_tokens(text: str) -> list[str]:
+def import_tokens(text: str) -> list[str]:
     tokens: list[str] = []
     fence: str | None = None
     for line in text.splitlines():
@@ -242,7 +244,7 @@ def _import_tokens(text: str) -> list[str]:
     return tokens
 
 
-def _looks_like_path(token: str) -> bool:
+def looks_like_path(token: str) -> bool:
     return "/" in token or bool(_EXTENSION.search(token))
 
 

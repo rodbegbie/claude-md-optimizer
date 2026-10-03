@@ -93,7 +93,7 @@ def possible_conflict(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     buckets: dict[frozenset[str], dict[bool, list[_Instruction]]] = {}
     found: list[Finding] = []
     for file in sorted(loaded(files), key=lambda f: f.order):
-        for number, line in prose_lines(file.text):
+        for number, line in prose_lines(file.source_text):
             parsed = _parse(line)
             if not parsed:
                 continue

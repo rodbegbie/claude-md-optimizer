@@ -40,6 +40,19 @@ class LoadedFile:
     imported_by: Path | None = None
     external: bool = False
     notes: list[str] = field(default_factory=list)
+    line_numbers: list[int] | None = None
+
+    @property
+    def source_text(self) -> str:
+        if self.line_numbers is None:
+            return self.text
+        out: list[str] = []
+        previous = 0
+        for number, line in zip(self.line_numbers, self.text.splitlines(keepends=True)):
+            out.append("\n" * (number - previous - 1))
+            out.append(line)
+            previous = number
+        return "".join(out)
 
     @property
     def lines(self) -> int:

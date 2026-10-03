@@ -48,7 +48,7 @@ def derivable_content(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             BEST_PRACTICES,
         )
         for file in loaded(files)
-        for hit in _hits(file.text)
+        for hit in _hits(file.source_text)
     ]
 
 

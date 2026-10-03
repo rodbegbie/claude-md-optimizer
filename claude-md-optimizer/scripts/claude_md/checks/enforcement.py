@@ -90,7 +90,7 @@ def hook_candidate(files: list[LoadedFile], ctx: Context) -> list[Finding]:
             BEST_PRACTICES,
         )
         for file in loaded(files)
-        for number, line in prose_lines(file.text)
+        for number, line in prose_lines(file.source_text)
         if _is_hook_candidate(line)
     ]
 
@@ -109,7 +109,7 @@ def _is_hook_candidate(line: str) -> bool:
 def emphasis_dilution(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     findings: list[Finding] = []
     for file in loaded(files):
-        lines = [n for n, line in prose_lines(file.text) if _is_emphatic(line)]
+        lines = [n for n, line in prose_lines(file.source_text) if _is_emphatic(line)]
         if len(lines) > EMPHASIS_LINE_LIMIT:
             findings.append(
                 Finding(

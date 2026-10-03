@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 from claude_md.checks._common import loaded
 from claude_md.checks._markdown import headings, prose_lines
-from claude_md.discovery import _import_tokens, _looks_like_path
+from claude_md.discovery import import_tokens, looks_like_path
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile, LoadMode
 
@@ -47,7 +47,7 @@ def scope_candidate(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     for file in loaded(files):
         if file.mode is not LoadMode.ALWAYS:
             continue
-        for number, title, count in _scoped_sections(file.text):
+        for number, title, count in _scoped_sections(file.source_text):
             findings.append(
                 Finding(
                     "scope-candidate",
@@ -94,9 +94,9 @@ def _is_scoped_line(line: str) -> bool:
 def import_misconception(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     findings: list[Finding] = []
     for file in loaded(files):
-        if not any(_looks_like_path(t) for t in _import_tokens(file.text)):
+        if not any(looks_like_path(t) for t in import_tokens(file.text)):
             continue
-        number = _first_claim_line(file.text)
+        number = _first_claim_line(file.source_text)
         if number is None:
             continue
         findings.append(

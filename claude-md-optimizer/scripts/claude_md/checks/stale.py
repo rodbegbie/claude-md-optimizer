@@ -159,6 +159,64 @@ PNPM_YARN_BUILTINS = frozenset(
     ]
 )
 NPM_RUN_FLAGS = frozenset(["--if-present", "--silent", "-s", "--ignore-scripts"])
+JS_BINARIES = frozenset(
+    [
+        "tsc",
+        "tsx",
+        "ts-node",
+        "eslint",
+        "prettier",
+        "jest",
+        "vitest",
+        "vite",
+        "webpack",
+        "rollup",
+        "esbuild",
+        "turbo",
+        "nx",
+        "next",
+        "nuxt",
+        "playwright",
+        "cypress",
+        "tailwindcss",
+        "nodemon",
+        "biome",
+        "rimraf",
+        "concurrently",
+        "husky",
+        "lint-staged",
+        "storybook",
+        "prisma",
+    ]
+)
+PROSE_AFTER_MAKE = frozenset(
+    [
+        "sure",
+        "sense",
+        "it",
+        "this",
+        "that",
+        "them",
+        "these",
+        "those",
+        "a",
+        "an",
+        "the",
+        "your",
+        "my",
+        "our",
+        "certain",
+        "use",
+        "up",
+        "no",
+        "any",
+        "changes",
+        "progress",
+        "room",
+        "time",
+    ]
+)
+DIRECTORY_CHANGERS = frozenset(["cd", "pushd"])
 MAKE_SOURCES = ("Makefile", "makefile", "GNUmakefile")
 
 _CODE_SPAN = re.compile(r"`([^`\n]+)`")
@@ -223,7 +281,7 @@ def stale_reference(files: list[LoadedFile], ctx: Context) -> list[Finding]:
         if file.scope not in CHECKED_SCOPES:
             continue
         directory = os.path.normpath(str(file.path.parent))
-        for number, line in prose_lines(file.text):
+        for number, line in prose_lines(file.source_text):
             seen: set[str] = set()
             for span in _CODE_SPAN.findall(line):
                 for problem in _span_problems(span, directory, run):
@@ -258,11 +316,17 @@ def _span_problems(span: str, directory: str, run: _Run) -> list[str]:
 def _command_problems(span: str, directory: str, run: _Run) -> list[str] | None:
     problems: list[str] = []
     is_command = False
+    changed_directory = False
     for segment in _COMMAND_BREAK.split(span):
         words = segment.split()
+        if words and words[0].lstrip("(") in DIRECTORY_CHANGERS:
+            changed_directory = True
+            continue
         if not words or words[0] not in ("npm", "pnpm", "yarn", "make"):
             continue
         is_command = True
+        if changed_directory:
+            continue
         directories = list(dict.fromkeys([directory, run.root]))
         if words[0] == "make":
             problems += _make_problems(words, directories, run)
@@ -299,10 +363,21 @@ def _script_problems(words: list[str], directories: list[str], run: _Run) -> lis
     package = run.package(directories)
     if package is None or name in package.scripts:
         return []
-    if not explicit_run and (name in package.dependencies or "." in name):
+    if not explicit_run and (
+        name in package.dependencies
+        or "." in name
+        or name in JS_BINARIES
+        or _has_local_binary(package, name)
+    ):
         return []
     command = " ".join(words[: 3 if explicit_run else 2])
     return [f"runs `{command}`, but {name} is not a script in {package.path}."]
+
+
+def _has_local_binary(package: _Package, name: str) -> bool:
+    return os.path.lexists(
+        os.path.join(str(package.path.parent), "node_modules", ".bin", name)
+    )
 
 
 def _make_problems(words: list[str], directories: list[str], run: _Run) -> list[str]:
@@ -317,6 +392,8 @@ def _make_problems(words: list[str], directories: list[str], run: _Run) -> list[
     if makefile is None:
         return []
     path, defined = makefile
+    if any(t in PROSE_AFTER_MAKE and t not in defined for t in targets):
+        return []
     return [
         f"runs `make {target}`, but no target named {target} is defined in {path}."
         for target in targets

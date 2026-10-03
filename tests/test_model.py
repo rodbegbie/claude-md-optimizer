@@ -41,6 +41,29 @@ def test_lines_ignore_stripped_comments():
     assert loaded.lines < len(raw.splitlines())
 
 
+def test_source_text_keeps_removed_lines_as_blanks():
+    raw = "one\n<!--\nhidden\n-->\ntwo\n"
+    loaded = make(LoadMode.ALWAYS)
+    loaded.raw = raw
+    loaded.text, loaded.line_numbers = text.effective_text_with_lines(
+        raw, is_rule=False
+    )
+    assert loaded.text == "one\ntwo\n"
+    assert loaded.source_text == "one\n\n\n\ntwo\n"
+    assert loaded.source_text.splitlines()[4] == "two"
+
+
+def test_source_text_is_text_without_a_line_map():
+    assert make(LoadMode.ALWAYS, "a\nb\n").source_text == "a\nb\n"
+
+
+def test_source_text_follows_a_truncated_text():
+    loaded = make(LoadMode.ALWAYS, "a\nb\nc\n")
+    loaded.line_numbers = [3, 4, 6]
+    loaded.text = "a\nb\n"
+    assert loaded.source_text == "\n\na\nb\n"
+
+
 def test_empty_text_has_zero_lines():
     assert make(LoadMode.ALWAYS, "").lines == 0
 

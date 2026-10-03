@@ -1,0 +1,29 @@
+yes, delete the empty branch
+
+---
+
+OK, let's work on Phase 2
+
+---
+
+2
+
+---
+
+make trail 2 as ready for review
+
+---
+
+/address-findings 3
+
+---
+
+commit and push the AGENTS.md change on main, then rebase my feature branch
+
+---
+
+push the planning branch commit
+
+---
+
+/claude-md-management:revise-claude-md AGENTS.md

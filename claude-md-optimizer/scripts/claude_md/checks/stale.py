@@ -148,6 +148,14 @@ PNPM_YARN_BUILTINS = frozenset(
         "setup",
         "self-update",
         "approve-builds",
+        "plugin",
+        "npm",
+        "constraints",
+        "explain",
+        "unplug",
+        "root",
+        "view",
+        "recursive",
     ]
 )
 NPM_RUN_FLAGS = frozenset(["--if-present", "--silent", "-s", "--ignore-scripts"])

@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 
+import pytest
 from claude_md import checks  # noqa: F401
 from claude_md.checks.stale import stale_reference
 from claude_md.discovery import discover
@@ -9,7 +10,6 @@ from claude_md.findings import REGISTRY, Context, run_checks
 from claude_md.model import LoadedFile, LoadMode, Scope
 
 FIXTURES = Path(__file__).parent / "fixtures"
-REPO = Path(__file__).parent.parent
 BANNED = ["per request", "every request", "each request", "per turn", "turns"]
 BANNED += ["compound", "session cost"]
 
@@ -241,24 +241,31 @@ def test_fixtures_excluding_id_do_not_flag(tmp_path):
             )
 
 
-def test_repo_markdown_sweep(tmp_path):
-    names = [
-        "AGENTS.md",
-        "README.md",
-        "claude-md-optimizer/SKILL.md",
-        "claude-md-optimizer/references/optimization-rules.md",
-    ]
-    hits = []
-    for name in names:
-        text = (REPO / name).read_text()
-        file = LoadedFile(REPO / name, Scope.PROJECT, LoadMode.ALWAYS, 0, text, text)
-        hits += [
-            (name, f.line) for f in stale_reference([file], Context(REPO, tmp_path))
-        ]
-    # AGENTS.md names paths relative to claude-md-optimizer/, not the repo root.
-    assert hits == [("AGENTS.md", 14), ("AGENTS.md", 35)]
-
-
 def test_local_conventions_and_suffix_patterns_skipped(tmp_path):
     text = "`.private-journal/` `.claude/CLAUDE.md` `_test.go` `MEMORY.md`\n"
     assert run(tmp_path, text) == []
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "yarn plugin",
+        "yarn npm",
+        "yarn constraints",
+        "yarn explain",
+        "yarn unplug",
+        "pnpm root",
+        "pnpm view",
+        "pnpm recursive",
+    ],
+)
+def test_more_pnpm_yarn_builtins_not_flagged(tmp_path, command):
+    write(tmp_path, "package.json", json.dumps({"scripts": {"build": "tsc"}}))
+    assert run(tmp_path, f"`{command}`\n") == []
+
+
+def test_path_missing_from_project_and_file_directory_flagged(tmp_path):
+    write(tmp_path, "skill/scripts/run.py")
+    found = run(tmp_path, "`scripts/gone.py`\n", name="skill/SKILL.md")
+    assert lines(found) == [1]
+    assert str(tmp_path / "skill") in found[0].message

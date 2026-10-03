@@ -19,17 +19,7 @@ def run_text(project, home):
     )
 
 
-def analysed_paths(result):
-    singles = [
-        result["project_claude_md"],
-        result["user_claude_md"],
-        result["memory_md"],
-    ]
-    analyses = [a for a in singles if a] + result["rules_files"] + result["other_files"]
-    return {a["path"] for a in analyses}
-
-
-def test_memory_analysis_uses_the_loaded_text(tree, run_cli):
+def test_memory_file_uses_the_loaded_text(tree, run_cli):
     root = tree({"project/CLAUDE.md": CONTENT})
     project = (root / "project").resolve()
     memory = root / "home" / ".claude" / "projects" / encode_project_path(project)
@@ -38,20 +28,20 @@ def test_memory_analysis_uses_the_loaded_text(tree, run_cli):
     result = run_cli(project)
     entry = next(f for f in result["files"] if f["scope"] == "memory")
     assert entry["lines"] == 200
-    assert result["memory_md"]["line_count"] == 200
 
 
-def test_project_analysis_ignores_html_comment_blocks(tree, run_cli):
+def test_project_file_ignores_html_comment_blocks(tree, run_cli):
     root = tree(
         {
             "project/CLAUDE.md": "<!--\nmaintainer note\nmore\n-->\n- Use uv.\n- Run pytest.\n"
         }
     )
     result = run_cli(root / "project")
-    assert result["project_claude_md"]["line_count"] == 2
+    entry = next(f for f in result["files"] if f["scope"] == "project")
+    assert entry["lines"] == 2
 
 
-def test_rule_analysis_ignores_frontmatter(tree, run_cli):
+def test_rule_file_ignores_frontmatter(tree, run_cli):
     root = tree(
         {
             "project/CLAUDE.md": CONTENT,
@@ -59,26 +49,31 @@ def test_rule_analysis_ignores_frontmatter(tree, run_cli):
         }
     )
     result = run_cli(root / "project")
-    assert result["rules_files"][0]["line_count"] == 2
+    entry = next(f for f in result["files"] if f["scope"] == "project_rule")
+    assert entry["lines"] == 2
 
 
-def test_agents_only_project_is_analysed_as_project_instructions(tree, run_cli):
+def test_agents_only_project_is_loaded_as_agents_instructions(tree, run_cli):
     root = tree({"project/AGENTS.md": CONTENT})
     result = run_cli(root / "project")
-    assert result["project_claude_md"] is not None
-    assert result["project_claude_md"]["path"].endswith("AGENTS.md")
-    assert result["project_claude_md"]["line_count"] == 3
+    entry = next(f for f in result["files"] if f["path"].endswith("AGENTS.md"))
+    assert entry["scope"] == "agents"
+    assert entry["mode"] == "always"
+    assert entry["lines"] == 3
 
 
 def test_agents_only_score_matches_the_same_content_as_claude_md(tree, run_cli):
     vague = "# T\n" + "Follow best practices.\nKeep code clean.\nWrite good code.\n" * 8
     root = tree({"a/AGENTS.md": vague, "b/CLAUDE.md": vague})
-    scores = run_cli(root / "a")["overall_score"], run_cli(root / "b")["overall_score"]
+    scores = (
+        run_cli(root / "a")["score"]["value"],
+        run_cli(root / "b")["score"]["value"],
+    )
     assert scores[0] == scores[1]
     assert scores[0] < 100
 
 
-def test_additional_project_level_files_are_analysed(tree, run_cli):
+def test_additional_project_level_files_are_loaded_in_order(tree, run_cli):
     root = tree(
         {
             "project/CLAUDE.md": CONTENT,
@@ -87,28 +82,33 @@ def test_additional_project_level_files_are_analysed(tree, run_cli):
         }
     )
     result = run_cli(root / "project")
-    assert result["project_claude_md"]["path"].endswith("project/CLAUDE.md")
-    assert [a["path"].split("project/", 1)[1] for a in result["other_files"]] == [
-        ".claude/CLAUDE.md",
-        "CLAUDE.local.md",
+    loaded = [
+        f["path"].split("project/", 1)[1]
+        for f in result["files"]
+        if "project/" in f["path"]
     ]
+    assert loaded == ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"]
 
 
-def test_every_always_on_file_is_analysed(tree, run_cli):
+def test_every_always_on_file_is_listed_and_checked(tree, run_cli):
+    vague = "Follow best practices.\n"
     root = tree(
         {
-            "project/CLAUDE.md": "@docs/x.md\n- Use uv.\n",
-            "project/docs/x.md": "- imported\n",
-            "project/.claude/CLAUDE.md": "- second\n",
-            "project/.claude/rules/r.md": "- rule\n",
-            "project/CLAUDE.local.md": "- local\n",
-            "home/.claude/CLAUDE.md": "- user\n",
+            "project/CLAUDE.md": "@docs/x.md\n" + vague,
+            "project/docs/x.md": vague,
+            "project/.claude/CLAUDE.md": vague,
+            "project/.claude/rules/r.md": vague,
+            "project/CLAUDE.local.md": vague,
+            "home/.claude/CLAUDE.md": vague,
         }
     )
     result = run_cli(root / "project")
     always = {f["path"] for f in result["files"] if f["mode"] == "always"}
     assert len(always) >= 6
-    assert analysed_paths(result) == always
+    checked = {
+        f["path"] for f in result["findings"] if f["check_id"] == "vague-instruction"
+    }
+    assert checked == always
 
 
 def test_text_mode_lists_the_additional_files(tree):
@@ -117,5 +117,4 @@ def test_text_mode_lists_the_additional_files(tree):
     )
     proc = run_text(root / "project", root / "home")
     assert proc.returncode == 0
-    assert "Other instruction file" in proc.stdout
     assert ".claude/CLAUDE.md" in proc.stdout

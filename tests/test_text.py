@@ -1,4 +1,3 @@
-import analyze_claude_md
 from claude_md import text
 
 
@@ -129,11 +128,72 @@ def test_effective_text_keeps_frontmatter_for_non_rules():
     assert text.effective_text(src, is_rule=False) == "---\nx: 1\n---\nbody\n"
 
 
-def test_estimate_tokens_matches_legacy():
-    samples = [
-        "The quick brown fox jumps over the lazy dog. " * 5,
-        "Use English words 日本語のテキスト and 한국어 mixed café",
-        "",
-    ]
-    for sample in samples:
-        assert text.estimate_tokens(sample) == analyze_claude_md.estimate_tokens(sample)
+def test_fence_step_opens_and_closes_with_the_same_delimiter():
+    assert text.fence_step("```py", None) == ("```", True)
+    assert text.fence_step("code", "```") == ("```", False)
+    assert text.fence_step("```", "```") == (None, True)
+    assert text.fence_step("  ~~~", None) == ("~~~", True)
+
+
+def test_fence_step_a_longer_opening_needs_an_equally_long_closing_run():
+    assert text.fence_step("````md", None) == ("````", True)
+    assert text.fence_step("```py", "````") == ("````", False)
+    assert text.fence_step("```", "````") == ("````", False)
+    assert text.fence_step("`````", "````") == (None, True)
+
+
+def test_fence_step_a_closing_fence_cannot_carry_an_info_string():
+    assert text.fence_step("```text", "```") == ("```", False)
+    assert text.fence_step("```   ", "```") == (None, True)
+
+
+def test_fence_step_does_not_mix_delimiter_characters():
+    assert text.fence_step("~~~", "```") == ("```", False)
+    assert text.fence_step("```", "~~~") == ("~~~", False)
+
+
+def test_fence_step_inline_triple_backticks_are_not_a_fence():
+    assert text.fence_step("```code``` in a sentence", None) == (None, False)
+    assert text.fence_step("plain line", None) == (None, False)
+
+
+def test_strip_html_comments_keeps_a_comment_inside_a_longer_fence():
+    src = "````md\n```\n<!-- keep -->\n```\n<!-- keep too -->\n````\n<!-- gone -->\n"
+    assert text.strip_html_comments(src) == src.replace("<!-- gone -->\n", "")
+
+
+def test_effective_lines_map_back_to_source_after_frontmatter_and_comment():
+    src = "---\npaths: a\n---\n<!-- c\nmore\n-->\nbody\nlast\n"
+    stripped, numbers = text.effective_text_with_lines(src, is_rule=True)
+    assert stripped == "body\nlast\n"
+    assert numbers == [7, 8]
+
+
+def test_effective_lines_keep_the_remainder_after_a_closing_comment():
+    src = "a\n<!-- x\n-->tail\nb\n"
+    stripped, numbers = text.effective_text_with_lines(src, is_rule=False)
+    assert stripped == "a\ntail\nb\n"
+    assert numbers == [1, 3, 4]
+
+
+def test_effective_lines_are_the_identity_without_anything_to_strip():
+    src = "a\nb\nc\n"
+    assert text.effective_text_with_lines(src, is_rule=True) == (src, [1, 2, 3])
+
+
+def test_effective_text_matches_effective_text_with_lines():
+    src = "---\npaths: a\n---\n<!-- c -->\nbody\n"
+    assert (
+        text.effective_text(src, is_rule=True)
+        == (text.effective_text_with_lines(src, is_rule=True)[0])
+    )
+
+
+def test_estimate_tokens_keeps_the_values_the_legacy_estimator_produced():
+    samples = {
+        "The quick brown fox jumps over the lazy dog. " * 5: 56,
+        "Use English words 日本語のテキスト and 한국어 mixed café": 15,
+        "": 0,
+    }
+    for sample, expected in samples.items():
+        assert text.estimate_tokens(sample) == expected

@@ -386,3 +386,19 @@ def test_shallower_reach_relaxes_uncut_ancestor(layout, selection):
     assert names == {f"f{i}.md" for i in range(1, 7)}
     assert by_name(root, files, "f4.md").notes == []
     assert by_name(root, files, "f6.md").notes == ["import depth limit reached: @f7.md"]
+
+
+def test_import_helpers_are_public_for_the_checks_that_reuse_them():
+    from claude_md.discovery import import_tokens, looks_like_path
+
+    text = "See @docs/a.md and `@not/this.md`.\n```\n@in/fence.md\n```\n"
+    assert import_tokens(text) == ["docs/a.md"]
+    assert looks_like_path("docs/a.md")
+    assert not looks_like_path("someone")
+
+
+def test_import_tokens_skip_a_longer_fence_with_an_inner_fence():
+    from claude_md.discovery import import_tokens
+
+    text = "````md\n```\n@a.md\n```\n@b.md\n````\n@c.md\n"
+    assert import_tokens(text) == ["c.md"]

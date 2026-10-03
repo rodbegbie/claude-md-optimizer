@@ -12,7 +12,7 @@ def test_memory_comes_from_current_project(tree, run_cli):
         }
     )
     result = run_cli(root / "project")
-    assert result["memory_md"] is None
+    assert [f for f in result["files"] if f["scope"] == "memory"] == []
 
 
 def test_memory_for_current_project_is_reported(tree, run_cli):
@@ -27,7 +27,8 @@ def test_memory_for_current_project_is_reported(tree, run_cli):
     (memory / "memory").mkdir(parents=True)
     (memory / "memory" / "MEMORY.md").write_text("- a\n- b\n- c\n")
     result = run_cli(project)
-    assert result["memory_md"]["line_count"] == 3
+    memory = next(f for f in result["files"] if f["scope"] == "memory")
+    assert memory["lines"] == 3
     assert result["memory_directory"]["found"] is True
 
 
@@ -39,7 +40,9 @@ def test_rules_are_scanned_recursively(tree, run_cli):
         }
     )
     result = run_cli(root / "project")
-    assert len(result["rules_files"]) == 1
+    rules = [f for f in result["files"] if f["scope"] == "project_rule"]
+    assert len(rules) == 1
+    assert rules[0]["path"].endswith("a/b.md")
 
 
 def test_path_scoped_rules_do_not_count_as_always_on(tree, run_cli):
@@ -53,6 +56,10 @@ def test_path_scoped_rules_do_not_count_as_always_on(tree, run_cli):
         }
     )
     result = run_cli(root / "project")
-    assert result["project_claude_md"]["line_count"] == 3
-    assert result["rules_files"][0]["line_count"] == 2
-    assert result["total_lines"] == 3 + 2
+    by_scope = {f["scope"]: f for f in result["files"] if f["mode"] == "always"}
+    assert by_scope["project"]["lines"] == 3
+    assert by_scope["project_rule"]["lines"] == 2
+    assert result["totals"]["always"] == sum(
+        f["tokens"] for f in result["files"] if f["mode"] == "always"
+    )
+    assert sum(f["lines"] for f in result["files"] if f["mode"] == "always") == 3 + 2

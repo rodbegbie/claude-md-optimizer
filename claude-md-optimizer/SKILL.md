@@ -5,185 +5,95 @@ description: Analyze and optimize CLAUDE.md files for Claude Code. This skill sh
 
 # CLAUDE.md Optimizer
 
-## Overview
+Audit the instruction files Claude Code loads for a project and move each
+piece of content to the place where it works best. Read
+`references/optimization-rules.md` when you need the source for a claim or
+the meaning of a check id; it tags every rule `[docs]` or `[heuristic]`.
 
-Analyze, score, and optimize CLAUDE.md files and related configuration
-(.claude/rules/, MEMORY.md) to maximize Claude Code's instruction-following
-quality while minimizing context token usage.
+## How loading works
 
-## Loaded Files
-
-Run the analysis script: its report lists exactly which files Claude Code loads
-for the project, in load order, and which are conditional or on demand.
-
-## Safety Rules
-
-- Never modify files without explicit user approval
-- Extract content verbatim when moving to sub-documents (never summarize or
-  paraphrase)
-- Verify zero information loss after every extraction
-- Back up original files before restructuring
-- Skip optimization if CLAUDE.md is already under 80 lines and well-structured
+- CLAUDE.md files, `CLAUDE.local.md`, rules without `paths:`, their `@path`
+  imports and MEMORY.md (first 200 lines or 25KB) load at session start.
+  Never describe this as a cost that recurs on every request or grows with
+  the number of turns.
+- Imported files load at launch together with the file that imports them,
+  so splitting a file into imports only reorganises it. A plain pointer
+  such as "see docs/x.md" loads nothing by itself; Claude reads the file
+  only if it decides the pointer applies.
+- Content loads later only through mechanisms Claude Code runs itself: a
+  rule with `paths:` frontmatter, a nested CLAUDE.md in a subdirectory, or
+  a skill.
+- CLAUDE.md is context, not enforced configuration: no wording or emphasis
+  guarantees Claude follows it. Only a hook runs every time.
+- Anthropic recommends under 200 lines per CLAUDE.md file. Every other
+  threshold is this tool's own and lives in the script, not in advice.
 
 ## Workflow
 
-### Step 1: Analyze Current State
+1. Run the analyser (the `scripts/` directory sits next to this file):
 
-Run the analysis script to get a baseline score and identify issues:
+   ```bash
+   python3 scripts/analyze_claude_md.py <project-dir>
+   ```
 
-```bash
-python3 scripts/analyze_claude_md.py <project-dir>
-```
+   Add `--json` for machine-readable output. The report lists each file
+   with its load mode (always, conditional, on demand, dormant, excluded or
+   skipped), estimated tokens by mode, the auto memory directory, the
+   limits that are still unverified, findings grouped into docs-backed and
+   heuristic, every deduction, and a score.
+1. Read the findings by source. A docs finding cites an Anthropic page. A
+   heuristic finding is this tool's judgement: offer it as a suggestion the
+   user may decline. The score starts at 100 and only goes down. It is this
+   tool's own measure, not an Anthropic metric, so never propose a change
+   just to raise it.
+1. Read every always-on file yourself. The checks match patterns and miss
+   things, such as an architecture overview written as prose. Choose a
+   destination for each section from the table below before acting on any
+   finding about its form; a section you delete needs no rewording.
+1. Propose each change against a named existing line or section, with its
+   reason, and apply only what the user approves.
+1. Re-run the analyser. Then ask the user to run `/context` in a new session
+   and check that the Memory files list shows what they expect.
 
-Pass `--json` for machine-readable output. If no project directory is
-specified, the current working directory is used. The script scans:
+Claude Code's built-in `/doctor` complements this: its checkup proposes
+trims for a checked-in CLAUDE.md, and `/doctor prompt-audit` looks for
+outdated or conflicting instructions.
 
-- Project-level `CLAUDE.md` (root or `.claude/CLAUDE.md`)
-- User-level `~/.claude/CLAUDE.md`
-- All `.claude/rules/*.md` files (project and user level)
-- `MEMORY.md` files
+## Destinations
 
-The report includes:
-
-- Per-file metrics (lines, tokens, structure quality)
-- **Non-English content detection** with token overhead estimate
-- **Cross-file duplicate detection** (content repeated between files)
-- Anti-pattern identification and actionable fixes
-
-Present the analysis report to the user, highlighting the score and top issues.
-
-### Step 2: Review Optimization Rules
-
-Read `references/optimization-rules.md` for the complete set of rules, limits,
-and best practices. Use this reference to identify which optimizations apply to
-the user's specific files.
-
-### Step 3: Apply Optimizations
-
-Apply the following optimizations in priority order, always confirming changes
-with the user:
-
-#### Priority 0 - Language optimization (if applicable)
-
-- Detect non-English content in CLAUDE.md files
-- Non-English instructions, especially CJK languages (Korean, Japanese,
-  Chinese), cost more tokens than English
-- Convert non-English instructions to English while preserving technical terms
-- Exception: Domain glossary terms, proper nouns, and user-facing strings stay
-  in original language
-
-#### Priority 1 - Remove bloat (highest impact)
-
-- Delete instructions Claude already follows by default
-- Remove content duplicated across files (cross-file dedup)
-- Remove content that belongs in linter/formatter configs (.editorconfig,
-  .prettierrc, .eslintrc)
-- Remove vague/non-actionable instructions ("follow best practices", "keep
-  code clean")
-
-#### Priority 2 - Restructure for efficiency
-
-- Convert paragraph text to bullet-point lists
-- Rewrite instructions in imperative form ("Use X" not "We use X")
-- Replace inline code snippets (over 5 lines) with file:line references
-- Keep short code patterns (3-5 lines) inline - moving them forces
-  re-derivation
-- Move task-specific content to .claude/rules/ with appropriate glob patterns
-
-#### Priority 3 - Apply progressive disclosure
-
-- Categorize content: Essential (every session), Reference (occasional),
-  Redundant (remove)
-- Move Reference content to sub-documents via verbatim extraction
-- Add a Sub-Documentation Table at the top of CLAUDE.md with links
-- Add trigger conditions to each reference ("Read X when modifying Y")
-- Keep Essential content inline, never extract it
-
-#### Priority 4 - Optimize attention placement
-
-- Place critical prohibitions and key commands at the top of each file
-- Place reference trigger index at the bottom
-
-#### Priority 5 - Add missing essentials
-
-- Add project summary one-liner if missing
-- Add key directory paths if missing
-- Add exact build/test/lint commands with flags if missing
-- Add explicit prohibitions ("DO NOT" list) if missing
-- Add domain glossary (5-10 terms) if specialized project
-
-#### Priority 6 - Modularize
-
-- Extract concern-specific rules into .claude/rules/ files
-- Add YAML glob headers to rule files for targeted loading
-
-#### Priority 7 - Future-proof
-
-- Add an "Information Recording Principles" section to prevent future bloat
-- Define what belongs in CLAUDE.md vs rules/ vs docs/ vs code comments
-- Establish a pattern for where new instructions should go
-
-### Step 4: Validate
-
-Run the analysis script again on the optimized files to verify improvement:
-
-```bash
-python3 scripts/analyze_claude_md.py <project-dir>
-```
-
-Verification checklist:
-
-- Score improved from baseline
-- Zero information loss (all content either kept inline, moved to sub-doc, or
-  intentionally removed with user approval)
-- Essential content still inline
-- All sub-document links are valid relative paths
-- CI/build scripts that parse CLAUDE.md still work
-
-Present before/after comparison: line counts, token estimates, and score.
-
-## Target Metrics
-
-Documented by Anthropic (Claude Code memory docs):
-
-| Metric | Limit |
+| Content | Destination |
 | --- | --- |
-| Each CLAUDE.md or rules file | under 200 lines |
-| MEMORY.md | first 200 lines or 25KB load |
-| Any instruction file | over 4 MiB is skipped |
+| Needed in every session | Stays in CLAUDE.md |
+| Applies to some paths only | `paths:` rule or nested CLAUDE.md |
+| Occasional task knowledge | A skill |
+| Must happen every time | A hook in settings |
+| Claude can derive it from code | Delete, with approval |
+| Notes for human maintainers | A block-level HTML comment |
+| Personal notes for this project | `CLAUDE.local.md` |
 
-The combined size limit behind Claude Code's startup warning is not
-documented, so no total is stated as official.
+- Derivable content means directory trees, dependency lists, architecture
+  overviews and file-by-file descriptions. Delete it outright. Do not keep a
+  condensed version or move it to another file. A single line recording a
+  decision or constraint the code cannot show may stay.
+- For a rule that has to hold every time, propose a hook: for example
+  `PostToolUse` to run a check once an edit lands, or `PreToolUse` to block an
+  edit or a command. Tell the user the CLAUDE.md line alone is advisory.
+- Do not create new imports or sub-documents to shrink context. Use the
+  mechanisms in the table, which Claude Code loads for you when they apply.
+  Correct any text that claims an import loads on demand.
+- If the analyser finds nothing and no row above applies, say the file is in
+  good shape and leave it. Do not add sections, reformat or reorder lines,
+  or suggest splits for some future size. Every proposed change needs a
+  functional reason.
 
-This tool's own heuristics (not from Anthropic's documentation):
+## Safety rules
 
-| Metric | Heuristic |
-| --- | --- |
-| Project CLAUDE.md | under 150 lines |
-| User CLAUDE.md | under 50 lines |
-| Rule files | under 30 lines each |
-| Total all sources | under 250 lines |
-| Optimization score | 80+ |
-| Information loss | 0% |
-| Non-English ratio | under 10% (convert to English) |
-| Cross-file duplicates | 0 |
-
-## Key Anti-Patterns to Fix
-
-- Non-English instructions where English would be more token-efficient
-- Content duplicated across global and project files (cross-file redundancy)
-- Formatting/style rules that belong in linters (eslint, prettier,
-  editorconfig)
-- Inline code blocks over 5 lines (replace with file:line references)
-- Narrative paragraphs (convert to bullet lists)
-- Vague directives ("follow best practices", "keep code clean")
-- Instructions for default Claude behavior
-- Reference content without trigger conditions
-- Critical instructions buried in the middle of the document
-
-## Resources
-
-- `scripts/analyze_claude_md.py` - Analysis and scoring tool (0-100 score,
-  anti-pattern detection, language detection, cross-file dedup)
-- `references/optimization-rules.md` - Complete optimization rules, limits,
-  progressive disclosure patterns, and checklist
+- Never modify a file without the user's explicit approval.
+- Back up the original files before restructuring.
+- Move content verbatim. Never summarise or paraphrase while moving it.
+- After each extraction, verify zero information loss: every line is still
+  present, moved verbatim, or deleted with approval.
+- Keep unlock instructions inline. If an instruction is needed to reach or
+  use other content (for example how to decrypt or authenticate first), it
+  stays next to that content.
+- Keep content that CI or scripts parse, in the form they expect.

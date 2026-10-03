@@ -10,7 +10,7 @@ CJK_RANGES = [
     (0x3130, 0x318F),
 ]
 
-_FENCE = re.compile(r"^\s*(```|~~~)")
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 _PATHS_KEY = re.compile(r"^paths:[ \t]*(.*)$")
 _LIST_ITEM = re.compile(r"^\s*-\s+(.*)$")
 
@@ -44,11 +44,32 @@ def estimate_tokens(text: str) -> int:
     return int(tokens)
 
 
-def strip_html_comments(text: str) -> str:
-    out: list[str] = []
+def fence_step(line: str, fence: str | None) -> tuple[str | None, bool]:
+    """Advance a fenced-code scan by one line.
+
+    `fence` is the opening delimiter run while inside a block, else None.
+    Returns the new state and whether this line opened or closed a block.
+    A block closes only on a bare run of the same character at least as long
+    as the opener.
+    """
+    match = _FENCE.match(line)
+    if not match:
+        return fence, False
+    run, rest = match.groups()
+    if fence is None:
+        if run[0] == "`" and "`" in rest:
+            return None, False
+        return run, True
+    if run[0] == fence[0] and len(run) >= len(fence) and not rest.strip():
+        return None, True
+    return fence, False
+
+
+def _strip_html_comments(text: str) -> list[tuple[int, str]]:
+    out: list[tuple[int, str]] = []
     fence: str | None = None
     in_comment = False
-    for line in text.splitlines(keepends=True):
+    for number, line in enumerate(text.splitlines(keepends=True), 1):
         if in_comment:
             end = line.find("-->")
             if end == -1:
@@ -56,15 +77,10 @@ def strip_html_comments(text: str) -> str:
             in_comment = False
             rest = line[end + 3 :]
             if rest.strip():
-                out.append(rest)
+                out.append((number, rest))
             continue
-        match = _FENCE.match(line)
-        if match:
-            if fence is None:
-                fence = match.group(1)
-            elif fence == match.group(1):
-                fence = None
-        if fence is None and not match and line.lstrip().startswith("<!--"):
+        fence, is_fence = fence_step(line, fence)
+        if fence is None and not is_fence and line.lstrip().startswith("<!--"):
             start = line.index("<!--")
             end = line.find("-->", start + 4)
             if end == -1:
@@ -72,10 +88,14 @@ def strip_html_comments(text: str) -> str:
                 continue
             rest = line[end + 3 :]
             if rest.strip():
-                out.append(rest)
+                out.append((number, rest))
             continue
-        out.append(line)
-    return "".join(out)
+        out.append((number, line))
+    return out
+
+
+def strip_html_comments(text: str) -> str:
+    return "".join(line for _, line in _strip_html_comments(text))
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:
@@ -176,7 +196,15 @@ def parse_paths(block: str | None) -> list[str] | None:
     return items or None
 
 
-def effective_text(text: str, *, is_rule: bool) -> str:
+def effective_text_with_lines(text: str, *, is_rule: bool) -> tuple[str, list[int]]:
+    removed = 0
     if is_rule:
+        before = len(text.splitlines(keepends=True))
         _, text = split_frontmatter(text)
-    return strip_html_comments(text)
+        removed = before - len(text.splitlines(keepends=True))
+    kept = _strip_html_comments(text)
+    return "".join(line for _, line in kept), [number + removed for number, _ in kept]
+
+
+def effective_text(text: str, *, is_rule: bool) -> str:
+    return effective_text_with_lines(text, is_rule=is_rule)[0]

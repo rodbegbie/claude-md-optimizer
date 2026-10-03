@@ -1,7 +1,12 @@
 from pathlib import Path
 
 from claude_md import checks  # noqa: F401
-from claude_md.checks._markdown import FencedBlock, fenced_blocks, prose_lines
+from claude_md.checks._markdown import (
+    FencedBlock,
+    fenced_blocks,
+    paragraph_lines,
+    prose_lines,
+)
 from claude_md.checks.patterns import (
     code_block_long,
     linter_rule,
@@ -113,3 +118,57 @@ def test_code_block_long_flags_over_five_lines():
 def test_code_block_long_ignores_five_line_block():
     body = "\n".join(f"line {i}" for i in range(5))
     assert code_block_long([make(f"```\n{body}\n```\n")], CTX) == []
+
+
+def narrative_lines(text: str) -> list[int]:
+    return [f.line for f in narrative_paragraph([make(text)], CTX)]
+
+
+def test_wrapped_list_items_are_not_narrative():
+    indented = "- First item that wraps\n  onto a second line\n  and a third line\n"
+    lazy = "- First item that wraps\nonto a second line\nand a third line\n"
+    numbered = "1. First item\n   second line\n   third line\n"
+    assert narrative_lines(indented) == []
+    assert narrative_lines(lazy) == []
+    assert narrative_lines(numbered) == []
+
+
+def test_loose_list_item_paragraph_with_continuation_indent_is_not_narrative():
+    text = "- Item\n\n  Para one.\n  Para two.\n  Para three.\n"
+    assert narrative_lines(text) == []
+
+
+def test_tables_blockquotes_html_and_definitions_are_not_narrative():
+    table = "| a | b |\n|---|---|\n| 1 | 2 |\n"
+    quote = "> one\n> two\n> three\n"
+    lazy_quote = "> one\ntwo\nthree\n"
+    html = "<details>\n<summary>x</summary>\n<p>y</p>\n"
+    defs = "[a]: http://a\n[b]: http://b\n[c]: http://c\n"
+    for text in (table, quote, lazy_quote, html, defs):
+        assert narrative_lines(text) == [], text
+
+
+def test_frontmatter_setext_and_rules_are_not_narrative():
+    front = "---\nname: x\ndescription: y\n---\n"
+    setext = "Title\n=====\nSub\n---\n"
+    rules = "---\n***\n___\n"
+    for text in (front, setext, rules):
+        assert narrative_lines(text) == [], text
+
+
+def test_real_paragraph_after_heading_is_flagged():
+    assert narrative_lines("# H\nOne.\nTwo.\nThree.\n") == [2]
+
+
+def test_real_paragraph_after_list_and_blank_is_flagged():
+    text = "- item\n  wrapped\n\nOne.\nTwo.\nThree.\n"
+    assert narrative_lines(text) == [4]
+
+
+def test_real_paragraph_after_frontmatter_is_flagged():
+    assert narrative_lines("---\nname: x\n---\nOne.\nTwo.\nThree.\n") == [4]
+
+
+def test_paragraph_lines_helper_keeps_only_plain_prose():
+    text = "# H\nplain\n- item\n  cont\n> q\n| t |\n\nlast\n"
+    assert list(paragraph_lines(text)) == [(2, "plain"), (8, "last")]

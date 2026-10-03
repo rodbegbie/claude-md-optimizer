@@ -1,7 +1,11 @@
 import re
 
 from claude_md.checks._common import loaded
-from claude_md.checks._markdown import fenced_blocks, prose_lines
+from claude_md.checks._markdown import (
+    fenced_blocks,
+    paragraph_lines,
+    prose_lines,
+)
 from claude_md.findings import Context, Finding, Source, check
 from claude_md.model import LoadedFile
 
@@ -31,8 +35,6 @@ VAGUE_PATTERNS = [
 
 MAX_CODE_BLOCK_LINES = 5
 MIN_NARRATIVE_LINES = 3
-
-_STRUCTURAL = re.compile(r"^\s*(#|[-*+]\s|\d+[.)]\s)")
 
 
 @check("vague-instruction", BEST_PRACTICES, weight=3, cap=9)
@@ -110,14 +112,12 @@ def narrative_paragraph(files: list[LoadedFile], ctx: Context) -> list[Finding]:
 
 
 def _prose_runs(text: str) -> list[list[int]]:
-    runs: list[list[int]] = [[]]
-    for number, line in prose_lines(text):
-        if not line.strip() or _STRUCTURAL.match(line):
-            runs.append([])
-        elif runs[-1] and number != runs[-1][-1] + 1:
-            runs.append([number])
-        else:
+    runs: list[list[int]] = []
+    for number, _ in paragraph_lines(text):
+        if runs and number == runs[-1][-1] + 1:
             runs[-1].append(number)
+        else:
+            runs.append([number])
     return runs
 
 

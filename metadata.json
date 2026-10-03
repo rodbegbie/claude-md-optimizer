@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M3ZM10FFP8FH3QNC1G2NHS8V",
+  "strategy": "manual-commit",
+  "branch": "feature/checks-and-scoring",
+  "checkpoints_count": 2,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 9143,
+    "cache_read_tokens": 1252177,
+    "output_tokens": 4562,
+    "api_call_count": 6,
+    "subagent_tokens": {
+      "input_tokens": 30,
+      "cache_creation_tokens": 54483,
+      "cache_read_tokens": 713275,
+      "output_tokens": 388,
+      "api_call_count": 14
+    }
+  }
+}

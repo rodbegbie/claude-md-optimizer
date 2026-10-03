@@ -24,7 +24,13 @@ Anthropic's current [memory][memory] and [best practices][anthropic] docs.
 
 ## Installation
 
-Clone the repo, then copy the skill directory into your skills directory:
+Install with the `skills` CLI:
+
+```bash
+npx skills install rodbegbie/claude-md-optimizer
+```
+
+Or clone the repo, then copy the skill directory into your skills directory:
 
 ```bash
 git clone https://github.com/rodbegbie/claude-md-optimizer.git

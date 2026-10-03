@@ -1,4 +1,3 @@
-import analyze_claude_md
 from claude_md import text
 
 
@@ -129,11 +128,11 @@ def test_effective_text_keeps_frontmatter_for_non_rules():
     assert text.effective_text(src, is_rule=False) == "---\nx: 1\n---\nbody\n"
 
 
-def test_estimate_tokens_matches_legacy():
-    samples = [
-        "The quick brown fox jumps over the lazy dog. " * 5,
-        "Use English words 日本語のテキスト and 한국어 mixed café",
-        "",
-    ]
-    for sample in samples:
-        assert text.estimate_tokens(sample) == analyze_claude_md.estimate_tokens(sample)
+def test_estimate_tokens_keeps_the_values_the_legacy_estimator_produced():
+    samples = {
+        "The quick brown fox jumps over the lazy dog. " * 5: 56,
+        "Use English words 日本語のテキスト and 한국어 mixed café": 15,
+        "": 0,
+    }
+    for sample, expected in samples.items():
+        assert text.estimate_tokens(sample) == expected

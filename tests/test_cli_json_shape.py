@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -34,7 +35,14 @@ def run_text(project, home):
 def test_json_has_files_totals_unverified(tree, run_cli):
     root = tree({"project/CLAUDE.md": "# Title\n- Use uv.\n"})
     result = run_cli(root / "project")
-    assert {"files", "totals", "unverified", "memory_directory"} <= set(result)
+    assert {
+        "files",
+        "totals",
+        "findings",
+        "score",
+        "unverified",
+        "memory_directory",
+    } == set(result)
     assert "session_cost_per_request" not in result
     assert "session_cost_30_turns" not in result
     assert result["files"]
@@ -52,7 +60,8 @@ def test_json_valid_for_empty_project(tree, run_cli):
     result = run_cli(root / "project")
     assert result["files"] == []
     assert result["totals"] == {"always": 0, "conditional": 0, "on_demand": 0}
-    assert result["project_claude_md"] is None
+    assert result["findings"] == []
+    assert result["score"] == {"value": 100, "deductions": []}
 
 
 def test_conditional_rule_listed_but_not_counted(tree, run_cli):
@@ -67,8 +76,7 @@ def test_conditional_rule_listed_but_not_counted(tree, run_cli):
     assert [f["mode"] for f in scoped] == ["conditional"]
     assert scoped[0]["scope"] == "project_rule"
     assert scoped[0]["paths"] == ["src/**"]
-    assert result["total_lines"] == 2
-    assert result["rules_files"] == []
+    assert all(f["path"] != scoped[0]["path"] for f in result["findings"])
     assert result["totals"]["conditional"] > 0
     always = [f for f in result["files"] if f["mode"] == "always"]
     assert result["totals"]["always"] == sum(f["tokens"] for f in always)
@@ -141,12 +149,46 @@ def test_non_english_messages_make_no_per_request_claims(tree, run_cli):
     cjk = "".join(f"- 请使用中文编写第{i}条说明文档\n" for i in range(20))
     root = tree({"project/CLAUDE.md": "# Title\n" + cjk})
     result = run_cli(root / "project")
-    analysis = result["project_claude_md"]
-    messages = analysis["issues"] + analysis["warnings"] + analysis["suggestions"]
-    assert any("Non-English content" in m for m in messages)
+    found = [f for f in result["findings"] if f["check_id"] == "non-english"]
+    assert found
     proc = run_text(root / "project", root / "home")
     assert proc.returncode == 0, proc.stderr
     assert "Non-English content" in proc.stdout
-    for text in ("\n".join(messages), proc.stdout):
+    texts = [proc.stdout, json.dumps(result)]
+    texts += [f["message"] + " " + f["fix"] for f in result["findings"]]
+    for text in texts:
         for phrase in BANNED:
             assert phrase not in text.lower()
+
+
+def test_json_findings_and_score_shape(tree, run_cli):
+    root = tree({"project/CLAUDE.md": "# T\n" + "Follow best practices.\n" * 4})
+    result = run_cli(root / "project")
+    assert result["findings"]
+    for entry in result["findings"]:
+        assert set(entry) == {
+            "check_id",
+            "severity",
+            "path",
+            "line",
+            "message",
+            "fix",
+            "source",
+        }
+        assert set(entry["source"]) == {"kind", "url"}
+    assert set(result["score"]) == {"value", "deductions"}
+    assert result["score"]["value"] == 100 - sum(
+        d["points"] for d in result["score"]["deductions"]
+    )
+    for deduction in result["score"]["deductions"]:
+        assert set(deduction) == {"check_id", "count", "points", "capped"}
+
+
+def test_text_mode_shows_groups_deductions_and_score(tree):
+    root = tree({"project/CLAUDE.md": "# T\n" + "Follow best practices.\n" * 4})
+    proc = run_text(root / "project", root / "home")
+    assert proc.returncode == 0, proc.stderr
+    assert "Backed by Anthropic docs" in proc.stdout
+    assert "Heuristics" in proc.stdout
+    assert "Deductions:" in proc.stdout
+    assert "Score:" in proc.stdout

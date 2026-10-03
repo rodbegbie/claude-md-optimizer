@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import claude_md.checks  # noqa: F401
 import pytest
 from claude_md import findings
 from claude_md.findings import Context, Finding, Source, check, run_checks
@@ -22,14 +23,7 @@ def make_file(name: str, mode: LoadMode) -> LoadedFile:
 
 
 def test_every_check_declares_source():
-    @check("t-docs", DOCS, weight=1, cap=1)
-    def docs_check(files, ctx):
-        return []
-
-    @check("t-heuristic", HEURISTIC, weight=1, cap=1)
-    def heuristic_check(files, ctx):
-        return []
-
+    assert findings.REGISTRY
     for spec in findings.REGISTRY.values():
         assert spec.source.kind in ("docs", "heuristic")
         if spec.source.kind == "docs":

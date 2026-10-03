@@ -1,5 +1,5 @@
 def test_cli_runs_on_minimal_project(tree, run_cli):
     root = tree({"project/CLAUDE.md": "# Title\n- Use uv.\n"})
     result = run_cli(root / "project")
-    assert "overall_score" in result
-    assert result["project_claude_md"]["line_count"] == 2
+    assert "value" in result["score"]
+    assert [f["lines"] for f in result["files"] if f["scope"] == "project"] == [2]

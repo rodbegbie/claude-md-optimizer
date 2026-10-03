@@ -15,8 +15,53 @@ _ABSOLUTE = re.compile(
 )
 _RUN_VERB = re.compile(r"\b(?:run|runs|running|execute|executing)\b", re.IGNORECASE)
 _CODE_SPAN = re.compile(r"`([^`\n]+)`")
-_EMPHASIS = re.compile(
-    r"\b(?:IMPORTANT|MUST|NEVER)\b|\b[A-Z]{2,}(?:\s+[A-Z]{2,}){2,}\b"
+_KEYWORD = re.compile(r"\b(?:IMPORTANT|MUST|NEVER)\b")
+_CAPS_RUN = re.compile(r"\b[A-Z]{2,}(?:\s+[A-Z]{2,})*\b")
+MIN_SHOUTED_RUN = 3
+ACRONYMS = frozenset(
+    [
+        "HTTP",
+        "HTTPS",
+        "API",
+        "URL",
+        "URI",
+        "JSON",
+        "YAML",
+        "TOML",
+        "XML",
+        "HTML",
+        "CSS",
+        "SQL",
+        "CLI",
+        "SDK",
+        "CPU",
+        "GPU",
+        "IDE",
+        "CI",
+        "CD",
+        "PR",
+        "ID",
+        "UI",
+        "UX",
+        "MCP",
+        "LLM",
+        "OS",
+        "SSH",
+        "TLS",
+        "DNS",
+        "TCP",
+        "UDP",
+        "REST",
+        "AWS",
+        "GCP",
+        "PDF",
+        "CSV",
+        "UTF",
+        "ASCII",
+        "EOF",
+        "TODO",
+        "README",
+    ]
 )
 
 HOOK_FIX = (
@@ -64,7 +109,7 @@ def _is_hook_candidate(line: str) -> bool:
 def emphasis_dilution(files: list[LoadedFile], ctx: Context) -> list[Finding]:
     findings: list[Finding] = []
     for file in loaded(files):
-        lines = [n for n, line in prose_lines(file.text) if _EMPHASIS.search(line)]
+        lines = [n for n, line in prose_lines(file.text) if _is_emphatic(line)]
         if len(lines) > EMPHASIS_LINE_LIMIT:
             findings.append(
                 Finding(
@@ -81,3 +126,15 @@ def emphasis_dilution(files: list[LoadedFile], ctx: Context) -> list[Finding]:
                 )
             )
     return findings
+
+
+def _is_emphatic(line: str) -> bool:
+    if _KEYWORD.search(line):
+        return True
+    for run in _CAPS_RUN.findall(line):
+        streak = 0
+        for word in run.split():
+            streak = 0 if word in ACRONYMS else streak + 1
+            if streak >= MIN_SHOUTED_RUN:
+                return True
+    return False

@@ -149,3 +149,39 @@ def test_fixtures_excluding_ids_do_not_flag(tmp_path):
         for check_id in ("hook-candidate", "emphasis-dilution"):
             if check_id in data["must_exclude"]:
                 assert check_id not in ids, expected.parent.name
+
+
+def six(line: str) -> str:
+    return (line + "\n") * 6
+
+
+def test_emphasis_acronym_runs_are_not_emphasis():
+    for line in ("Uses HTTP API URL helpers.", "JSON API SDK notes."):
+        assert emphasis_dilution([make(six(line))], CTX) == []
+
+
+def test_emphasis_shouted_run_counts():
+    assert len(emphasis_dilution([make(six("DO NOT EVER touch this"))], CTX)) == 1
+
+
+def test_emphasis_acronym_breaks_run():
+    assert emphasis_dilution([make(six("DO NOT API EVER"))], CTX) == []
+
+
+def test_emphasis_acronym_does_not_rescue_genuine_run():
+    text = six("HTTP DO NOT EVER touch this")
+    assert len(emphasis_dilution([make(text)], CTX)) == 1
+
+
+def test_emphasis_keywords_count_next_to_acronyms():
+    assert len(emphasis_dilution([make(six("API MUST work"))], CTX)) == 1
+
+
+def test_known_limit_hook_misses_bare_or_noncommand_spans():
+    text = "Never commit `.env` files.\nAlways `pytest` before pushing.\n"
+    assert hook_candidate([make(text)], CTX) == []
+
+
+def test_known_limit_hook_accepts_spaced_span_that_is_not_a_command():
+    text = "Never write `foo bar` in titles.\n"
+    assert len(hook_candidate([make(text)], CTX)) == 1

@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-Scores are not comparable with earlier versions. The old score was a sum of
-weighted line-count and pattern metrics. The new score starts at 100 and only
-deducts for findings, so the same file can score very differently.
+Scores are not comparable with earlier versions. The old score deducted per
+issue, warning and suggestion, and added bonuses for structure such as
+trigger conditions and prohibitions sections. The new score has no bonuses
+and caps the deduction for each check, so the same file can score very
+differently.
 
 ### Changed
 

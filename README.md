@@ -24,11 +24,12 @@ Anthropic's current [memory][memory] and [best practices][anthropic] docs.
 
 ## Installation
 
-Clone the repo into your skills directory:
+Clone the repo, then copy the skill directory into your skills directory:
 
 ```bash
-git clone https://github.com/rodbegbie/claude-md-optimizer.git /tmp/cmo
-cp -R /tmp/cmo/claude-md-optimizer ~/.claude/skills/
+git clone https://github.com/rodbegbie/claude-md-optimizer.git
+mkdir -p ~/.claude/skills
+cp -R claude-md-optimizer/claude-md-optimizer ~/.claude/skills/
 ```
 
 The skill directory is `claude-md-optimizer/`. It needs Python 3.13 or later
@@ -56,7 +57,8 @@ python3 ~/.claude/skills/claude-md-optimizer/scripts/analyze_claude_md.py \
 
 ## Example output
 
-Paths are shortened and long lines wrapped here.
+An excerpt: paths are shortened, long lines wrapped, and `...` marks
+omitted findings, `Fix:` lines and deductions. The score is the real total.
 
 ```text
 ============================================================
@@ -78,15 +80,18 @@ Paths are shortened and long lines wrapped here.
         directory tree. Claude can read this from the code or
         config, so it can usually be cut.
         Docs: https://code.claude.com/docs/en/best-practices
+    ...
 
   Heuristics (this tool's own judgement) (4):
     [suggestion] code-block-long: /project/CLAUDE.md:7 contains a
         code block of 18 lines (over 5).
+    ...
 
 ------------------------------------------------------------
   Deductions:
     code-block-long: 1 finding(s), -1
     derivable-content: 2 finding(s), -4
+    ...
 
   Score: 90/100 (starts at 100; only deductions apply)
 ============================================================

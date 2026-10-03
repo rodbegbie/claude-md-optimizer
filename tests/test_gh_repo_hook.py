@@ -57,6 +57,21 @@ def run_hook(command: str) -> subprocess.CompletedProcess[str]:
         "gh cache delete --all",
         "gh pr create --title \"it's (unterminated quote",
         'gh issue comment 1 --body "oops',
+        'echo "$(gh pr create --title t)"',
+        'url="$(gh pr create --title t)"',
+        'echo "`gh pr create --title t`"',
+        "env -u GH_TOKEN gh pr create --title t",
+        "xargs -I {} gh pr create --title t",
+        "nice -n 10 gh pr create --title t",
+        "sudo -u root gh pr create --title t",
+        "timeout 30 gh pr create --title t",
+        "if true; then gh pr create --title t; fi",
+        "for i in 1; do gh pr create --title t; done",
+        "{ gh pr create --title t; }",
+        "! gh pr create --title t",
+        "cat <(gh pr create --title t)",
+        f"gh repo sync {UPSTREAM} --source {FORK}",
+        "cat <<'EOF' | gh pr create --title t\nbody\nEOF",
     ],
 )
 def test_blocks_writes_not_aimed_at_the_fork(command):
@@ -94,6 +109,11 @@ def test_blocks_writes_not_aimed_at_the_fork(command):
         f"GH_TOKEN=x gh pr create --repo {FORK}",
         f"bash -c 'gh pr merge 7 --repo {FORK}'",
         "git log --oneline\ngit status",
+        f'url="$(gh pr create --repo {FORK} --title t)"',
+        "env -u GH_TOKEN gh pr view 7",
+        "timeout 30 gh pr view 7",
+        "cat > notes.md <<'EOF'\nIt's easy: gh pr create\nEOF",
+        f"gh pr create --repo {FORK} --body \"$(cat <<'EOF'\nIt's: gh pr view\nEOF\n)\"",
     ],
 )
 def test_allows_reads_and_fork_writes(command):

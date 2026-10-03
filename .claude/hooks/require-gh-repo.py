@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""PreToolUse hook (matcher: Bash): gh writes must target the fork."""
+"""PreToolUse hook (matcher: Bash): gh writes must target the fork.
+
+This guards against accidents by reading the command text. It is not a hard
+guarantee. It cannot see a gh call built at run time, such as `echo "gh pr
+create" | sh`, `python3 -c ...`, `GH=gh; $GH pr create` or nesting more than
+three levels deep, and a command it cannot parse is allowed whenever it names
+the fork anywhere.
+"""
 
 import json
 import os
@@ -8,7 +15,8 @@ import shlex
 import sys
 
 FORK = "rodbegbie/claude-md-optimizer"
-OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
+OPERATORS = {";", "&&", "||", "|", "&", "(", ")", "<(", ">("}
+KEYWORDS = {"if", "then", "else", "elif", "while", "until", "do", "!", "{", "}"}
 READ_VERBS = {
     "view",
     "list",
@@ -51,7 +59,19 @@ WRAPPERS = {
     "nohup",
     "nice",
     "xargs",
+    "timeout",
+    "setsid",
+    "stdbuf",
 }
+WRAPPER_VALUE_FLAGS = {
+    "env": {"-u", "-S", "-C"},
+    "nice": {"-n"},
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U"},
+    "xargs": {"-I", "-n", "-P", "-L", "-d", "-s", "-E", "-a"},
+    "timeout": {"-s", "-k"},
+    "stdbuf": {"-i", "-o", "-e"},
+}
+HEREDOC = re.compile(r"(?<!<)<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
 SHELLS = {"bash", "sh", "zsh", "dash"}
 API_READ_METHODS = {"GET", "HEAD"}
 API_FIELD_FLAGS = {"-f", "-F", "--field", "--raw-field", "--input"}
@@ -97,6 +117,56 @@ def normalise(command: str) -> str:
     return "".join(out)
 
 
+def strip_heredocs(command: str) -> str:
+    """Drop heredoc bodies, which are data, but keep the rest of their line."""
+    start = 0
+    while match := HEREDOC.search(command, start):
+        line_end = command.find("\n", match.end())
+        if line_end == -1:
+            return command
+        terminator = re.compile(
+            rf"^[ \t]*{re.escape(match.group(2))}[ \t]*$", re.MULTILINE
+        )
+        end = terminator.search(command, line_end + 1)
+        if end is None:
+            start = match.end()
+            continue
+        command = command[:line_end] + command[end.end() :]
+        start = line_end
+    return command
+
+
+def substitutions(command: str) -> list[str]:
+    """Return the bodies of $(...) and, inside double quotes, `...`."""
+    bodies: list[str] = []
+    quote = ""
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if ch == "\\" and quote != "'":
+            i += 2
+            continue
+        if quote == "'":
+            quote = "" if ch == "'" else quote
+        elif ch == "'" and not quote:
+            quote = "'"
+        elif ch == '"':
+            quote = "" if quote == '"' else '"'
+        elif command.startswith("$(", i):
+            level, j = 1, i + 2
+            while j < len(command) and level:
+                level += (command[j] == "(") - (command[j] == ")")
+                j += 1
+            bodies.append(command[i + 2 : j - 1 if level == 0 else j])
+        elif ch == "`" and quote == '"':
+            j = command.find("`", i + 1)
+            if j != -1:
+                bodies.append(command[i + 1 : j])
+                i = j
+        i += 1
+    return bodies
+
+
 def segments(command: str) -> list[list[str]]:
     lexer = shlex.shlex(normalise(command), posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
@@ -124,7 +194,8 @@ def names_fork(args: list[str]) -> bool:
         if arg.startswith("--repo="):
             return normalise_repo(arg.split("=", 1)[1]) == fork
     if args[:1] == ["repo"]:
-        return any(normalise_repo(a) == fork for a in args[1:])
+        positionals = [a for a in args[2:] if not a.startswith("-")]
+        return bool(positionals) and normalise_repo(positionals[0]) == fork
     return False
 
 
@@ -173,29 +244,38 @@ def api_problem(args: list[str]) -> str | None:
 def unwrap(tokens: list[str]) -> tuple[list[str], bool]:
     via_xargs = False
     while tokens:
-        if ASSIGNMENT.match(tokens[0]):
+        name = os.path.basename(tokens[0])
+        if ASSIGNMENT.match(tokens[0]) or tokens[0] in KEYWORDS:
             tokens = tokens[1:]
-        elif os.path.basename(tokens[0]) in WRAPPERS:
-            via_xargs = via_xargs or tokens[0] == "xargs"
+        elif name in WRAPPERS:
+            via_xargs = via_xargs or name == "xargs"
             tokens = tokens[1:]
             while tokens and tokens[0].startswith("-"):
+                flag, tokens = tokens[0], tokens[1:]
+                if flag in WRAPPER_VALUE_FLAGS.get(name, ()):
+                    tokens = tokens[1:]
+            if name == "timeout" and tokens:
                 tokens = tokens[1:]
         else:
             break
     return tokens, via_xargs
 
 
-def problems_in(command: str, depth: int = 0) -> list[str]:
+def problems_in(command: str, depth: int = 0, fallback: bool = True) -> list[str]:
+    command = strip_heredocs(command)
     try:
         parsed = segments(command)
     except ValueError:
-        if UNPARSEABLE_GH.search(command) and FORK not in command.lower():
+        if fallback and UNPARSEABLE_GH.search(command) and FORK not in command.lower():
             return [f"could not parse a gh command; name {FORK} to allow it"]
         return []
     found: list[str] = []
     for segment in parsed:
         found.extend(segment_problems(segment, depth))
-    return found
+    if depth <= 3:
+        for body in substitutions(command):
+            found.extend(problems_in(body, depth + 1, fallback=False))
+    return list(dict.fromkeys(found))
 
 
 def segment_problems(tokens: list[str], depth: int) -> list[str]:

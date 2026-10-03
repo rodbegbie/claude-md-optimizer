@@ -246,8 +246,12 @@ def find_cross_file_duplicates(file_contents: dict) -> list:
     return duplicates
 
 
-def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
+def analyze_file(
+    filepath: str, content: Optional[str] = None, scope: Scope = Scope.PROJECT
+) -> FileAnalysis:
     analysis = FileAnalysis(path=filepath)
+    is_rule = scope in (Scope.USER_RULE, Scope.PROJECT_RULE)
+    is_memory = scope == Scope.MEMORY
 
     if content is None:
         if not os.path.exists(filepath):
@@ -378,22 +382,23 @@ def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
             )
 
     # --- Line count checks ---
-    if "rules" in filepath.lower():
+    if is_rule:
         if analysis.line_count > 30:
             analysis.warnings.append(
                 f"Rule file has {analysis.line_count} lines (recommended: under 30). "
                 "Split into more focused rule files."
             )
-    elif ".claude/CLAUDE.md" in filepath or "/.claude/" in filepath:
+    elif scope == Scope.USER:
         if analysis.line_count > 50:
             analysis.issues.append(
                 f"User-level CLAUDE.md has {analysis.line_count} lines (recommended: under 50)."
             )
-    else:
+    elif not is_memory:
         if analysis.line_count > 150:
             analysis.issues.append(
-                f"Project CLAUDE.md has {analysis.line_count} lines (recommended: under 150). "
-                "Risk of silent truncation and instruction loss."
+                f"Project CLAUDE.md has {analysis.line_count} lines "
+                "(this tool's heuristic: under 150; Anthropic's guidance is under 200). "
+                "Longer files may reduce adherence."
             )
 
     # --- Structure checks ---
@@ -434,7 +439,7 @@ def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
         )
 
     # --- Progressive disclosure checks (only for project CLAUDE.md) ---
-    if analysis.line_count > 80 and "rules" not in filepath.lower():
+    if analysis.line_count > 80 and not is_rule:
         if not analysis.has_trigger_conditions:
             analysis.suggestions.append(
                 "No trigger conditions found. Add 'Read X when modifying Y' patterns "
@@ -458,7 +463,7 @@ def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
         )
 
     # --- Missing essentials check ---
-    if analysis.line_count > 20 and "rules" not in filepath.lower() and "memory" not in filepath.lower():
+    if analysis.line_count > 20 and not is_rule and not is_memory:
         if not analysis.has_prohibitions:
             analysis.suggestions.append(
                 "No prohibition statements found. Add explicit 'DO NOT' rules - "
@@ -471,7 +476,7 @@ def analyze_file(filepath: str, content: Optional[str] = None) -> FileAnalysis:
             )
 
     # --- Future-proofing check ---
-    if analysis.line_count > 80 and not analysis.has_info_recording_principles and "rules" not in filepath.lower():
+    if analysis.line_count > 80 and not analysis.has_info_recording_principles and not is_rule:
         analysis.suggestions.append(
             "No 'information recording principles' section found. Add rules for "
             "where new instructions belong to prevent future bloat."
@@ -558,7 +563,7 @@ def main():
         None,
     )
     for f in always:
-        analysis = analyze_file(str(f.path), f.text)
+        analysis = analyze_file(str(f.path), f.text, f.scope)
         if f is primary:
             report.project_claude_md = analysis
         elif f.scope == Scope.USER:

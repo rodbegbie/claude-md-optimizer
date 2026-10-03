@@ -1,0 +1,9 @@
+undraft the PR.
+
+---
+
+I verified the hooks in a new session.  Now address findings on the entire trail.
+
+---
+
+The AGENTS.md one is a good call.  Regarding settings.json, I checked and Entire leaves our hook alone, so update the doc that says Entire manages the whole file.

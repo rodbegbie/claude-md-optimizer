@@ -1,0 +1,294 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M3ZKM58BWZ4PYZ56M7QQTMTH",
+  "session_id": "0c8fa331-9bb6-4fd5-819d-8351f968f3c0",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-03T00:46:32.040177Z",
+  "branch": "feature/checks-and-scoring",
+  "checkpoints_count": 2,
+  "save_step_count": 10,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5-5",
+  "turn_id": "cbe929d1ff79",
+  "checkpoint_transcript_start": 611,
+  "transcript_lines_at_start": 611,
+  "compact_transcript_start": 77,
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 10394,
+    "cache_read_tokens": 1232667,
+    "output_tokens": 5495,
+    "api_call_count": 7,
+    "subagent_tokens": {
+      "input_tokens": 32,
+      "cache_creation_tokens": 72304,
+      "cache_read_tokens": 792310,
+      "output_tokens": 4403,
+      "api_call_count": 16
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01Mgccer6mcgaFbqmD6as17V",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "init"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "342c8c57ad97",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 33,
+        "end": 34,
+        "entry_ids": [
+          "b7c9bb25-a00e-4076-a0c0-2f1c74077c41"
+        ],
+        "tool_use_id": "toolu_01Mgccer6mcgaFbqmD6as17V"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Mgccer6mcgaFbqmD6as17V"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: init",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01DQ2QmcKec5P7r9Dqk8Xpkd",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "markdown"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "342c8c57ad97",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 89,
+        "end": 90,
+        "entry_ids": [
+          "862264be-657b-4163-8511-07a7fbb0835d"
+        ],
+        "tool_use_id": "toolu_01DQ2QmcKec5P7r9Dqk8Xpkd"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01DQ2QmcKec5P7r9Dqk8Xpkd"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: markdown",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01VQkptko2T8dEDPMESFzccq",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "superpowers:subagent-driven-development"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "13af21085efd",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 197,
+        "end": 198,
+        "entry_ids": [
+          "6b9bb756-3dd6-413f-9ad2-c9e63dc5dd3f"
+        ],
+        "tool_use_id": "toolu_01VQkptko2T8dEDPMESFzccq"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01VQkptko2T8dEDPMESFzccq"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: superpowers:subagent-driven-development",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 13
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 377,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/.active-session": 1,
+        ".agent-traces/.active-session.v2.claude.30633866613333312d396262362d3466.0c335c8f04141d595a367d83a75a5e8f4032e2d8be91e0d59d3a3453da630bcc": 1,
+        ".agent-traces/.pending-calls.v2.claude.30633866613333312d396262362d3466.0c335c8f04141d595a367d83a75a5e8f4032e2d8be91e0d59d3a3453da630bcc.json": 1,
+        ".agent-traces/.pending-calls.v2.claude.34376539626332352d613066302d3434.856d7b375822f68e9f28ae95fff559cbda2f87fd823dbd0a982d20824c5cada8.json": 1,
+        ".agent-traces/.pending-calls.v2.claude.37303131623562312d383361362d3438.9b0969ec6d2b998d8ecefce9678d92de5e08a0d7775f4ebe821c823e6cc0ee50.json": 1,
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 40,
+        ".agent-traces/0c8fa331-9bb6-4f/meta.json": 18,
+        ".agent-traces/47e9bc25-a0f0-44/events.ndjson": 230,
+        ".agent-traces/47e9bc25-a0f0-44/meta.json": 20,
+        ".agent-traces/7011b5b1-83a6-48/events.ndjson": 44,
+        ".agent-traces/7011b5b1-83a6-48/meta.json": 20
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 162,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 62,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 32,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-report.md": 16
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 169,
+      "user_lines_removed": 0,
+      "agent_lines_added": 199,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 84,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 33,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 180,
+      "user_lines_removed": 0,
+      "agent_lines_added": 199,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 94,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 34,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 398,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 105,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 34,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-report.md": 24,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183
+      }
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 394,
+      "user_lines_removed": 0,
+      "agent_lines_added": 98,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 124,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 35,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183
+      }
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 603,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 176,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 37,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-fix1-review-package.diff": 74,
+        ".superpowers/sdd/phase2/task-2.1-report.md": 24,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183,
+        ".superpowers/sdd/phase2/task-2.2-brief.md": 22,
+        ".superpowers/sdd/phase2/task-2.2-report.md": 35
+      }
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 561,
+      "user_lines_removed": 0,
+      "agent_lines_added": 394,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 192,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 38,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-fix1-review-package.diff": 74,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183,
+        ".superpowers/sdd/phase2/task-2.2-brief.md": 22
+      }
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 1047,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 236,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 40,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-fix1-review-package.diff": 74,
+        ".superpowers/sdd/phase2/task-2.1-report.md": 24,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183,
+        ".superpowers/sdd/phase2/task-2.2-brief.md": 22,
+        ".superpowers/sdd/phase2/task-2.2-report.md": 35,
+        ".superpowers/sdd/phase2/task-2.2-review-package.diff": 335,
+        ".superpowers/sdd/phase2/task-2.3-brief.md": 22,
+        ".superpowers/sdd/phase2/task-2.3-report.md": 24
+      }
+    },
+    {
+      "checkpoint_number": 10,
+      "user_lines_added": 983,
+      "user_lines_removed": 0,
+      "agent_lines_added": 356,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".agent-traces/0c8fa331-9bb6-4f/events.ndjson": 254,
+        ".superpowers/sdd/phase2/global-constraints.md": 24,
+        ".superpowers/sdd/phase2/progress.md": 41,
+        ".superpowers/sdd/phase2/task-2.1-brief.md": 28,
+        ".superpowers/sdd/phase2/task-2.1-fix1-review-package.diff": 74,
+        ".superpowers/sdd/phase2/task-2.1-review-package.diff": 183,
+        ".superpowers/sdd/phase2/task-2.2-brief.md": 22,
+        ".superpowers/sdd/phase2/task-2.2-review-package.diff": 335,
+        ".superpowers/sdd/phase2/task-2.3-brief.md": 22
+      }
+    }
+  ]
+}

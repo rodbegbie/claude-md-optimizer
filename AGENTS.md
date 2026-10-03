@@ -86,3 +86,8 @@ reports all of them.
   confirm the remote did not move, retry once, and never force.
 - `.claude/`, `.codex/` and `.entire/` configs are tracked and belong to the
   Entire integration. `.agent-traces/` and `.private-journal/` are not.
+
+<!-- entire-agent:begin -->
+Read .entire/agent-guide.md for this repository's workflow, source inspection, and verification guidance.
+@.entire/agent-guide.md
+<!-- entire-agent:end -->
